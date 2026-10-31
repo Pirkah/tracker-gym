@@ -584,22 +584,25 @@ function renderWorkoutLauncher(container) {
       </div>
     `
     : state.templates.map((tpl, idx) => {
-        const tokens = tpl.items.map((it) => {
+        const exoRows = tpl.items.map((it) => {
           const exo = getExercise(it.exerciseId);
           if (!exo) return '';
           return `
-            <span class="strip-exo-token">
-              ${escapeHtml(exo.name)} <strong>${it.setsCount}×${escapeHtml(it.targetReps)}</strong>
-            </span>
+            <div class="strip-exo-row">
+              <span class="strip-exo-name">${escapeHtml(exo.name)}</span>
+              <span class="strip-exo-target">${it.setsCount} × ${escapeHtml(it.targetReps)}</span>
+            </div>
           `;
-        }).join('<span style="color:var(--text-ghost);">•</span>');
+        }).join('');
 
         return `
           <div class="workout-strip" data-action="start-template" data-id="${tpl.id}">
             <div class="strip-index-watermark">${String(idx + 1).padStart(2, '0')}</div>
             <div class="strip-body">
               <div class="strip-title">${escapeHtml(tpl.name)}</div>
-              <div class="strip-flow-exos">${tokens}</div>
+              <div class="strip-exo-list">
+                ${exoRows}
+              </div>
             </div>
             <button type="button" class="orb-launch-btn" data-action="start-template" data-id="${tpl.id}">
               ${ICONS.play}
