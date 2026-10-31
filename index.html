@@ -6,8 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PULSE" />
-  <meta name="theme-color" content="#000000" />
-  <title>PULSE — Workout Tracker</title>
+  <meta name="theme-color" content="#050507" />
+  <title>PULSE — Spatial Gym Tracker</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
@@ -15,11 +15,14 @@
 </head>
 <body>
   <div id="app" class="app-shell">
-    <!-- Ambient Background Glow -->
-    <div class="ambient-orb ambient-orb-1"></div>
-    <div class="ambient-orb ambient-orb-2"></div>
+    <!-- Atmospheric Mesh & Subtle Dot Grid -->
+    <div class="canvas-backdrop">
+      <div class="ambient-aurora aurora-1"></div>
+      <div class="ambient-aurora aurora-2"></div>
+      <div class="dot-matrix"></div>
+    </div>
 
-    <!-- Minimal iOS Top Header -->
+    <!-- Open Editorial Header -->
     <header class="top-bar" id="top-bar">
       <div class="top-bar-left">
         <span class="brand-kicker" id="page-kicker">AUJOURD'HUI</span>
@@ -28,7 +31,7 @@
       <div class="top-bar-right" id="top-bar-actions"></div>
     </header>
 
-    <!-- Main Scrollable Viewport -->
+    <!-- Main Spatial Canvas -->
     <main class="main-content" id="main-content">
       <section id="tab-workout" class="tab-view active">
         <div id="workout-container"></div>
@@ -47,7 +50,7 @@
       </section>
     </main>
 
-    <!-- Floating Dynamic Island Style Rest Timer -->
+    <!-- Floating Liquid Glass Rest Timer Capsule -->
     <div id="rest-timer-bar" class="rest-timer-island hidden">
       <div class="island-top">
         <div class="island-left">
@@ -59,12 +62,12 @@
           </div>
           <div class="island-text">
             <span class="island-label" id="rest-timer-exo-name">Récupération</span>
-            <span class="island-time" id="rest-timer-display">01:30</span>
+            <span class="island-time" id="rest-timer-display">03:00</span>
           </div>
         </div>
         <div class="island-actions">
-          <button type="button" class="island-pill-btn" id="timer-minus-15">-15</button>
-          <button type="button" class="island-pill-btn" id="timer-plus-15">+15</button>
+          <button type="button" class="island-pill-btn" id="timer-minus-15">-15s</button>
+          <button type="button" class="island-pill-btn" id="timer-plus-15">+15s</button>
           <button type="button" class="island-pill-btn island-watch-btn" id="timer-watch-trigger" title="Envoyer vers Apple Watch">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 6V3h6v3"/><path d="M9 18v3h6v-3"/></svg>
           </button>
@@ -75,9 +78,10 @@
       </div>
     </div>
 
-    <!-- Floating iOS Glass Dock Navigation -->
+    <!-- Liquid Glass Main Navigation Bar -->
     <div class="dock-wrapper">
-      <nav class="floating-dock">
+      <nav class="liquid-glass-dock">
+        <div class="liquid-glare"></div>
         <button type="button" class="dock-item active" data-tab="workout">
           <div class="dock-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -91,8 +95,7 @@
         <button type="button" class="dock-item" data-tab="templates">
           <div class="dock-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="4" y="4" width="16" height="16" rx="4"/>
-              <path d="M9 9h6M9 13h6M9 17h4"/>
+              <path d="M4 6h16M4 12h10M4 18h14"/>
             </svg>
           </div>
           <span>Programmes</span>
@@ -101,11 +104,11 @@
         <button type="button" class="dock-item" data-tab="stats">
           <div class="dock-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 3v18h18"/>
-              <path d="m7 14 4-4 4 3 5-6"/>
+              <path d="M2 20h20"/>
+              <path d="M5 16c3-6 5-9 8-4s4-7 7-9"/>
             </svg>
           </div>
-          <span>Progrès</span>
+          <span>Courbes</span>
         </button>
 
         <button type="button" class="dock-item" data-tab="settings">
@@ -122,7 +125,7 @@
     </div>
   </div>
 
-  <!-- Smooth iOS Sheet Modal -->
+  <!-- Fluid Glass Sheet Modal -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal-sheet" id="modal-sheet">
       <div class="modal-handle"></div>
@@ -136,7 +139,7 @@
     </div>
   </div>
 
-  <!-- Dynamic Island Toast Notification -->
+  <!-- Toast Notification -->
   <div id="toast-container" class="toast-container"></div>
 
   <script src="app.js"></script>
