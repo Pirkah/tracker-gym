@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironpulse-v6';
+const CACHE_NAME = 'ironpulse-v7';
 const ASSETS = [
   './',
   './index.html',

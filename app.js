@@ -667,7 +667,10 @@ function renderWorkoutLauncher(container) {
   `;
 }
 
-function renderActiveWorkout(container) {
+function renderActiveWorkout(container, scrollActivePillIntoView = false) {
+  const prevRibbon = container.querySelector('.exo-deck-ribbon');
+  const savedRibbonScroll = prevRibbon ? prevRibbon.scrollLeft : 0;
+
   const wk = state.activeWorkout;
   let completedSets = 0;
   let totalSets = 0;
@@ -868,6 +871,17 @@ function renderActiveWorkout(container) {
       <button type="button" class="btn btn-primary" data-action="finish-workout">Terminer la séance</button>
     </div>
   `;
+
+  const newRibbon = container.querySelector('.exo-deck-ribbon');
+  if (newRibbon) {
+    newRibbon.scrollLeft = savedRibbonScroll;
+    if (scrollActivePillIntoView) {
+      const activePill = newRibbon.querySelector('.deck-pill.active');
+      if (activePill) {
+        activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }
 }
 
 /* ==========================================================================
@@ -1685,7 +1699,7 @@ function setupEvents() {
     } else if (action === 'focus-exo-pill') {
       const raw = btn.dataset.idx;
       state.ui.focusedExoIdx = raw === 'all' ? 'all' : parseInt(raw);
-      renderWorkoutTab();
+      renderActiveWorkout(document.getElementById('workout-container'), true);
     } else if (action === 'toggle-live-unilateral') {
       const idx = parseInt(btn.dataset.exoIdx);
       const wExo = state.activeWorkout.exercises[idx];
