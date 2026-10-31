@@ -1324,6 +1324,12 @@ function renderSettingsTab() {
         <input type="file" id="import-json-input" accept=".json,application/json" style="display:none;" />
       </label>
     </div>
+
+    <div style="padding:12px 0 24px; border-top:1px solid var(--hairline);">
+      <button type="button" class="btn btn-ghost btn-block" data-action="force-app-update">
+        ↻ Actualiser la version de l'application (sans perdre mes données)
+      </button>
+    </div>
   `;
 
   const watchToggle = document.getElementById('toggle-watch-shortcut');
@@ -1846,6 +1852,8 @@ function setupEvents() {
       restoreFromCloud();
     } else if (action === 'export-json') {
       exportDataJson();
+    } else if (action === 'force-app-update') {
+      forceUpdateApp();
     }
   });
 
@@ -2115,13 +2123,43 @@ function escapeAttr(str) {
   return escapeHtml(str);
 }
 
+async function forceUpdateApp() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) {
+        await r.unregister();
+      }
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      for (const k of keys) {
+        await caches.delete(k);
+      }
+    }
+  } catch {}
+  window.location.reload(true);
+}
+
 async function initApp() {
   await loadState();
   setupEvents();
   renderAll();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
+      reg.update();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+    }).catch(() => {});
   }
 }
 
