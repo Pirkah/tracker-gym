@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="IronPulse" />
+  <meta name="theme-color" content="#09090b" />
+  <title>IronPulse — Gym Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- Top Header -->
+    <header class="top-bar" id="top-bar">
+      <div class="top-bar-left">
+        <span class="app-logo-dot"></span>
+        <h1 id="page-title">S'entraîner</h1>
+      </div>
+      <div class="top-bar-right" id="top-bar-actions">
+        <!-- Dynamic context action (e.g. Workout elapsed time, Cloud status) -->
+      </div>
+    </header>
+
+    <!-- Main Scrollable Viewport -->
+    <main class="main-content" id="main-content">
+      <!-- TAB 1: WORKOUT (S'ENTRAÎNER) -->
+      <section id="tab-workout" class="tab-view active">
+        <div id="workout-container"></div>
+      </section>
+
+      <!-- TAB 2: TEMPLATES (MES SÉANCES & EXOS) -->
+      <section id="tab-templates" class="tab-view">
+        <div id="templates-container"></div>
+      </section>
+
+      <!-- TAB 3: STATS (STATISTIQUES PAR EXO) -->
+      <section id="tab-stats" class="tab-view">
+        <div id="stats-container"></div>
+      </section>
+
+      <!-- TAB 4: SETTINGS, CLOUD & APPLE WATCH -->
+      <section id="tab-settings" class="tab-view">
+        <div id="settings-container"></div>
+      </section>
+    </main>
+
+    <!-- Floating Rest Timer Banner -->
+    <div id="rest-timer-bar" class="rest-timer-bar hidden">
+      <div class="rest-timer-progress-wrap">
+        <div id="rest-timer-progress" class="rest-timer-progress"></div>
+      </div>
+      <div class="rest-timer-content">
+        <div class="rest-timer-info">
+          <span class="rest-timer-label" id="rest-timer-exo-name">Repos en cours</span>
+          <span class="rest-timer-countdown" id="rest-timer-display">01:30</span>
+        </div>
+        <div class="rest-timer-controls">
+          <button type="button" class="timer-btn" id="timer-minus-15">-15s</button>
+          <button type="button" class="timer-btn" id="timer-plus-15">+15s</button>
+          <button type="button" class="timer-btn watch-btn" id="timer-watch-trigger" title="Lancer sur Apple Watch">⌚</button>
+          <button type="button" class="timer-btn skip-btn" id="timer-skip">Passer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Tab Navigation (iOS Ergonomic) -->
+    <nav class="bottom-nav">
+      <button type="button" class="nav-item active" data-tab="workout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.5 6.5 17.5 17.5"/><path d="M3 10l7-7"/><path d="M14 21l7-7"/><path d="m2 6 4-4"/><path d="m18 22 4-4"/>
+        </svg>
+        <span>Séance</span>
+        <span id="active-workout-dot" class="nav-live-dot hidden"></span>
+      </button>
+      <button type="button" class="nav-item" data-tab="templates">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="12" y2="17"/>
+        </svg>
+        <span>Programmes</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>Stats & PR</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4Z"/>
+          <circle cx="12" cy="14" r="2"/>
+        </svg>
+        <span>Cloud & Watch</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Universal Modal / Sheet -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-sheet" id="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-title">Titre</h3>
+        <button type="button" class="modal-close-btn" id="modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
