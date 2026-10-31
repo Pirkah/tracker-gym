@@ -1,12 +1,11 @@
 /* ==========================================================================
-   PULSE — Apple Fitness+ Inspired iOS Gym Tracker
+   PULSE — iOS Liquid Glass Gym Tracker
    ========================================================================== */
 
-const STORAGE_KEY = 'ironpulse_data_v1';
-const IDB_NAME = 'IronPulseDB';
+const STORAGE_KEY = 'pulse_user_data_v1';
+const IDB_NAME = 'PulseUserDB';
 const IDB_STORE = 'state';
 
-// Clean Vector Icons
 const ICONS = {
   play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7-11-7z"/></svg>`,
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
@@ -19,141 +18,7 @@ const ICONS = {
   history: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>`
 };
 
-const DEFAULT_EXERCISES = [
-  { id: 'ex_bench_db', name: 'Développé Couché Haltères', muscle: 'Pectoraux', unilateral: false, defaultRest: 120, note: 'Banc à plat, omoplates serrées' },
-  { id: 'ex_incline_machine', name: 'Développé Incliné Convergent', muscle: 'Pectoraux', unilateral: true, defaultRest: 120, note: 'Siège cran 4, poids indiqué par côté' },
-  { id: 'ex_lat_raise_cable', name: 'Élévations Latérales Poulie', muscle: 'Épaules', unilateral: true, defaultRest: 75, note: 'Poulie hauteur poignet (cran 2)' },
-  { id: 'ex_triceps_rope', name: 'Extension Triceps Poulie Haute', muscle: 'Triceps', unilateral: false, defaultRest: 90, note: 'Coudes fixes le long du corps' },
-  { id: 'ex_lat_pulldown', name: 'Tirage Vertical Poitrine', muscle: 'Dos', unilateral: false, defaultRest: 120, note: 'Boudins cuisses cran 3, prise large' },
-  { id: 'ex_row_uni', name: 'Rowing Haltère / Machine 1 Bras', muscle: 'Dos', unilateral: true, defaultRest: 90, note: 'Tirer vers la hanche, commencer par le bras gauche' },
-  { id: 'ex_curl_incline', name: 'Curl Incliné Haltères', muscle: 'Biceps', unilateral: true, defaultRest: 90, note: 'Banc à 45°, supination complète' },
-  { id: 'ex_hack_squat', name: 'Hack Squat / Presse à cuisses', muscle: 'Quadriceps', unilateral: false, defaultRest: 150, note: 'Pieds bas du plateau, descente contrôlée' },
-  { id: 'ex_leg_ext', name: 'Leg Extension Unilatéral', muscle: 'Quadriceps', unilateral: true, defaultRest: 90, note: 'Dossier cran 3, boudin bas tibia' },
-  { id: 'ex_leg_curl', name: 'Leg Curl Assis', muscle: 'Ischios', unilateral: false, defaultRest: 90, note: 'Boudin au-dessus des chevilles, 1s contraction' },
-  { id: 'ex_bulgarian', name: 'Fentes Bulgares Haltères', muscle: 'Fessiers / Quadris', unilateral: true, defaultRest: 120, note: 'Buste légèrement penché en avant' }
-];
-
-const DEFAULT_TEMPLATES = [
-  {
-    id: 'tpl_push',
-    name: 'Push — Pecs, Épaules & Triceps',
-    items: [
-      { exerciseId: 'ex_bench_db', setsCount: 3, targetReps: '8-10', restSeconds: 120 },
-      { exerciseId: 'ex_incline_machine', setsCount: 3, targetReps: '8-12', restSeconds: 120 },
-      { exerciseId: 'ex_lat_raise_cable', setsCount: 4, targetReps: '12-15', restSeconds: 75 },
-      { exerciseId: 'ex_triceps_rope', setsCount: 3, targetReps: '10-12', restSeconds: 90 }
-    ]
-  },
-  {
-    id: 'tpl_pull',
-    name: 'Pull — Dos & Biceps',
-    items: [
-      { exerciseId: 'ex_lat_pulldown', setsCount: 3, targetReps: '8-10', restSeconds: 120 },
-      { exerciseId: 'ex_row_uni', setsCount: 3, targetReps: '8-12', restSeconds: 90 },
-      { exerciseId: 'ex_curl_incline', setsCount: 3, targetReps: '10-12', restSeconds: 90 }
-    ]
-  },
-  {
-    id: 'tpl_legs',
-    name: 'Legs — Jambes Complètes',
-    items: [
-      { exerciseId: 'ex_hack_squat', setsCount: 3, targetReps: '6-10', restSeconds: 150 },
-      { exerciseId: 'ex_bulgarian', setsCount: 3, targetReps: '8-10', restSeconds: 120 },
-      { exerciseId: 'ex_leg_ext', setsCount: 3, targetReps: '12-15', restSeconds: 90 },
-      { exerciseId: 'ex_leg_curl', setsCount: 3, targetReps: '10-12', restSeconds: 90 }
-    ]
-  }
-];
-
-function createSampleHistory() {
-  const now = Date.now();
-  const day = 86400000;
-  return [
-    {
-      id: 'wk_demo_1',
-      templateId: 'tpl_push',
-      name: 'Push — Pecs, Épaules & Triceps',
-      date: new Date(now - 7 * day).toISOString(),
-      durationSec: 3420,
-      exercises: [
-        {
-          exerciseId: 'ex_bench_db',
-          unilateral: false,
-          sets: [
-            { tag: 'W', weight: 20, reps: 12, rir: '3+', done: true },
-            { tag: '1', weight: 32, reps: 10, rir: '1', done: true },
-            { tag: '2', weight: 32, reps: 9, rir: '0', done: true }
-          ]
-        },
-        {
-          exerciseId: 'ex_incline_machine',
-          unilateral: true,
-          sets: [
-            { tag: '1', weight: 35, repsLeft: 10, repsRight: 10, rir: '1', done: true },
-            { tag: '2', weight: 37.5, repsLeft: 8, repsRight: 9, rir: '0', done: true },
-            { tag: '3', weight: 37.5, repsLeft: 8, repsRight: 8, rir: '0', done: true }
-          ]
-        },
-        {
-          exerciseId: 'ex_lat_raise_cable',
-          unilateral: true,
-          sets: [
-            { tag: '1', weight: 7.5, repsLeft: 14, repsRight: 15, rir: '1', done: true },
-            { tag: '2', weight: 7.5, repsLeft: 13, repsRight: 14, rir: '0', done: true },
-            { tag: '3', weight: 7.5, repsLeft: 12, repsRight: 12, rir: 'F', done: true }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'wk_demo_2',
-      templateId: 'tpl_push',
-      name: 'Push — Pecs, Épaules & Triceps',
-      date: new Date(now - 3 * day).toISOString(),
-      durationSec: 3600,
-      exercises: [
-        {
-          exerciseId: 'ex_bench_db',
-          unilateral: false,
-          sets: [
-            { tag: 'W', weight: 22, reps: 10, rir: '3+', done: true },
-            { tag: '1', weight: 34, reps: 9, rir: '1', done: true },
-            { tag: '2', weight: 34, reps: 8, rir: '0', done: true },
-            { tag: '3', weight: 32, reps: 10, rir: '0', done: true }
-          ]
-        },
-        {
-          exerciseId: 'ex_incline_machine',
-          unilateral: true,
-          sets: [
-            { tag: '1', weight: 40, repsLeft: 9, repsRight: 10, rir: '1', done: true },
-            { tag: '2', weight: 40, repsLeft: 8, repsRight: 9, rir: '0', done: true },
-            { tag: '3', weight: 40, repsLeft: 7, repsRight: 8, rir: '0', done: true }
-          ]
-        },
-        {
-          exerciseId: 'ex_lat_raise_cable',
-          unilateral: true,
-          sets: [
-            { tag: '1', weight: 8.75, repsLeft: 13, repsRight: 13, rir: '1', done: true },
-            { tag: '2', weight: 8.75, repsLeft: 12, repsRight: 13, rir: '0', done: true },
-            { tag: '3', weight: 8.75, repsLeft: 11, repsRight: 12, rir: '0', done: true }
-          ]
-        },
-        {
-          exerciseId: 'ex_triceps_rope',
-          unilateral: false,
-          sets: [
-            { tag: '1', weight: 25, reps: 12, rir: '1', done: true },
-            { tag: '2', weight: 27.5, reps: 10, rir: '0', done: true },
-            { tag: '3', weight: 27.5, reps: 9, rir: '0', done: true }
-          ]
-        }
-      ]
-    }
-  ];
-}
-
+// Clean user state (0 pre-installed exercises, you build your own!)
 let state = {
   exercises: [],
   templates: [],
@@ -169,8 +34,9 @@ let state = {
   },
   ui: {
     activeTab: 'workout',
-    selectedStatExoId: 'ex_bench_db',
-    statMetric: 'maxWeight'
+    selectedStatExoId: '',
+    statMetric: 'maxWeight',
+    quickAddUni: false
   }
 };
 
@@ -251,6 +117,9 @@ function saveState(triggerCloud = false) {
 }
 
 async function loadState() {
+  // Remove old demo data key if present
+  try { localStorage.removeItem('ironpulse_data_v1'); } catch {}
+
   let raw = localStorage.getItem(STORAGE_KEY);
   let parsed = null;
   if (raw) {
@@ -260,16 +129,16 @@ async function loadState() {
     parsed = await loadFromIDB();
   }
 
-  if (parsed && Array.isArray(parsed.exercises) && parsed.exercises.length > 0) {
-    state.exercises = parsed.exercises;
-    state.templates = parsed.templates || DEFAULT_TEMPLATES;
-    state.history = parsed.history || [];
+  if (parsed) {
+    state.exercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+    state.templates = Array.isArray(parsed.templates) ? parsed.templates : [];
+    state.history = Array.isArray(parsed.history) ? parsed.history : [];
     state.activeWorkout = parsed.activeWorkout || null;
     state.settings = { ...state.settings, ...(parsed.settings || {}) };
   } else {
-    state.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
-    state.templates = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
-    state.history = createSampleHistory();
+    state.exercises = [];
+    state.templates = [];
+    state.history = [];
     state.activeWorkout = null;
     saveState();
   }
@@ -346,7 +215,7 @@ function normalizeCloudUrl(url) {
 }
 
 /* ==========================================================================
-   Helpers
+   Helpers & Auto-Create Exercise By Name
    ========================================================================== */
 
 function uid(prefix = 'id') {
@@ -355,6 +224,35 @@ function uid(prefix = 'id') {
 
 function getExercise(id) {
   return state.exercises.find((e) => e.id === id) || null;
+}
+
+function findOrCreateExerciseByName(rawName, isUnilateral = false, defaultRest = 90) {
+  const cleanName = (rawName || '').trim();
+  if (!cleanName) return null;
+
+  const existing = state.exercises.find(
+    (e) => e.name.trim().toLowerCase() === cleanName.toLowerCase()
+  );
+
+  if (existing) {
+    existing.unilateral = !!isUnilateral;
+    if (defaultRest) existing.defaultRest = parseInt(defaultRest) || 90;
+    return existing;
+  }
+
+  const created = {
+    id: uid('ex'),
+    name: cleanName,
+    muscle: 'Général',
+    unilateral: !!isUnilateral,
+    defaultRest: parseInt(defaultRest) || 90,
+    note: ''
+  };
+  state.exercises.push(created);
+  if (!state.ui.selectedStatExoId) {
+    state.ui.selectedStatExoId = created.id;
+  }
+  return created;
 }
 
 function formatDuration(sec) {
@@ -673,33 +571,43 @@ function renderWorkoutLauncher(container) {
     }, 0);
   }, 0);
 
-  const templatesHtml = state.templates.map((tpl) => {
-    const pills = tpl.items.map((it) => {
-      const exo = getExercise(it.exerciseId);
-      if (!exo) return '';
-      return `
-        <span class="soft-pill">
-          ${escapeHtml(exo.name)}
-          <strong>${it.setsCount}×${escapeHtml(it.targetReps)}</strong>
-        </span>
-      `;
-    }).join('');
-
-    return `
-      <div class="workout-program-card" data-action="start-template" data-id="${tpl.id}">
-        <div class="workout-program-top">
-          <div>
-            <div class="workout-program-title">${escapeHtml(tpl.name)}</div>
-            <div class="workout-program-sub">${tpl.items.length} exercices programmés</div>
-          </div>
-          <button type="button" class="play-circle-btn" data-action="start-template" data-id="${tpl.id}">
-            ${ICONS.play}
-          </button>
-        </div>
-        <div class="pill-cloud">${pills}</div>
+  const templatesHtml = state.templates.length === 0
+    ? `
+      <div class="card" style="text-align:center; padding:32px 20px;">
+        <div style="font-size:1.15rem; font-weight:800; margin-bottom:6px;">Crée ton premier programme</div>
+        <p style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:18px; line-height:1.45;">
+          Tape directement le nom de tes exercices dans ta séance type (tu n'as même pas besoin de les créer à l'avance).
+        </p>
+        <button type="button" class="btn btn-primary" data-action="create-template">+ Créer ma première séance</button>
       </div>
-    `;
-  }).join('');
+    `
+    : state.templates.map((tpl) => {
+        const pills = tpl.items.map((it) => {
+          const exo = getExercise(it.exerciseId);
+          if (!exo) return '';
+          return `
+            <span class="soft-pill">
+              ${escapeHtml(exo.name)}
+              <strong>${it.setsCount}×${escapeHtml(it.targetReps)}</strong>
+            </span>
+          `;
+        }).join('');
+
+        return `
+          <div class="workout-program-card" data-action="start-template" data-id="${tpl.id}">
+            <div class="workout-program-top">
+              <div>
+                <div class="workout-program-title">${escapeHtml(tpl.name)}</div>
+                <div class="workout-program-sub">${tpl.items.length} exercices programmés</div>
+              </div>
+              <button type="button" class="play-circle-btn" data-action="start-template" data-id="${tpl.id}">
+                ${ICONS.play}
+              </button>
+            </div>
+            <div class="pill-cloud">${pills}</div>
+          </div>
+        `;
+      }).join('');
 
   const recentHistory = [...state.history]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -730,20 +638,21 @@ function renderWorkoutLauncher(container) {
     <div class="hero-summary">
       <div class="hero-summary-left">
         <span class="hero-summary-title">BILAN GLOBAL</span>
-        <div class="hero-summary-val"><span>${totalSessions}</span> séances • ${(totalVolumeAll / 1000).toFixed(1)}t soulevées</div>
+        <div class="hero-summary-val"><span>${totalSessions}</span> séances • ${(totalVolumeAll / 1000).toFixed(1)}t</div>
       </div>
       <button type="button" class="btn btn-ghost" data-action="start-empty-workout">+ Libre</button>
     </div>
 
     <div class="section-header">
-      <span class="section-title">Lancer ma séance</span>
+      <span class="section-title">Mes Séances</span>
+      ${state.templates.length > 0 ? `<button type="button" class="btn btn-ghost btn-sm" data-action="create-template">+ Nouvelle</button>` : ''}
     </div>
     <div class="template-grid">
       ${templatesHtml}
     </div>
 
     <div class="section-header" style="margin-top:28px;">
-      <span class="section-title">Récemment</span>
+      <span class="section-title">Historique récent</span>
     </div>
     ${historyHtml}
   `;
@@ -764,7 +673,7 @@ function renderActiveWorkout(container) {
     const exo = getExercise(wExo.exerciseId) || {
       id: wExo.exerciseId,
       name: 'Exercice',
-      muscle: 'Autre',
+      muscle: 'Général',
       unilateral: wExo.unilateral,
       note: ''
     };
@@ -901,71 +810,119 @@ function renderActiveWorkout(container) {
 }
 
 /* ==========================================================================
-   Tab 2: Templates & Exercise Library
+   Tab 2: Programmes & Ultra-Fast Inline Exercise Creator
    ========================================================================== */
 
 function renderTemplatesTab() {
   const container = document.getElementById('templates-container');
 
-  const tplListHtml = state.templates.map((tpl) => {
-    const exoLines = tpl.items.map((item, idx) => {
-      const exo = getExercise(item.exerciseId);
-      if (!exo) return '';
-      return `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:0.86rem;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="color:var(--volt); font-weight:800; font-size:0.76rem;">0${idx + 1}</span>
-            <strong style="font-weight:700;">${escapeHtml(exo.name)}</strong>
-            ${exo.unilateral ? `<span class="badge badge-unilateral">G/D</span>` : ''}
-          </div>
-          <span style="color:var(--text-secondary); font-weight:700;">${item.setsCount} × ${escapeHtml(item.targetReps)}</span>
-        </div>
-      `;
-    }).join('');
+  const tplListHtml = state.templates.length === 0
+    ? `
+      <div class="card" style="text-align:center; padding:26px 18px; color:var(--text-secondary); font-size:0.86rem;">
+        Aucune séance créée. Appuie sur <strong>+ Nouvelle séance</strong> ci-dessus pour composer ton programme en tapant tes exos directement !
+      </div>
+    `
+    : state.templates.map((tpl) => {
+        const exoLines = tpl.items.map((item, idx) => {
+          const exo = getExercise(item.exerciseId);
+          if (!exo) return '';
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:0.86rem;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="color:var(--volt); font-weight:800; font-size:0.76rem;">0${idx + 1}</span>
+                <strong style="font-weight:700;">${escapeHtml(exo.name)}</strong>
+                ${exo.unilateral ? `<span class="badge badge-unilateral">Unilatéral G/D</span>` : ''}
+              </div>
+              <span style="color:var(--text-secondary); font-weight:700;">${item.setsCount} × ${escapeHtml(item.targetReps)}</span>
+            </div>
+          `;
+        }).join('');
 
-    return `
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h3 style="font-size:1.12rem; font-weight:800; letter-spacing:-0.02em;">${escapeHtml(tpl.name)}</h3>
+        return `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="font-size:1.12rem; font-weight:800; letter-spacing:-0.02em;">${escapeHtml(tpl.name)}</h3>
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="circle-icon-btn" data-action="edit-template" data-id="${tpl.id}">${ICONS.edit}</button>
+                <button type="button" class="circle-icon-btn" data-action="delete-template" data-id="${tpl.id}">${ICONS.trash}</button>
+              </div>
+            </div>
+            <div>${exoLines || '<span style="color:var(--text-tertiary); font-size:0.82rem;">Aucun exercice</span>'}</div>
+          </div>
+        `;
+      }).join('');
+
+  const exercisesHtml = state.exercises.length === 0
+    ? `<div class="card" style="color:var(--text-secondary); font-size:0.84rem; text-align:center;">Ta bibliothèque est vide. Ajoute un exercice ci-dessus ou crée directement une séance type !</div>`
+    : state.exercises.map((exo) => `
+        <div class="card" style="padding:15px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div>
+            <div style="font-weight:800; font-size:0.96rem; display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+              <span>${escapeHtml(exo.name)}</span>
+              <span class="badge ${exo.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">
+                ${exo.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}
+              </span>
+            </div>
+            ${exo.note ? `<div style="font-size:0.78rem; color:var(--text-secondary); margin-top:5px;">📌 ${escapeHtml(exo.note)}</div>` : ''}
+          </div>
           <div style="display:flex; gap:6px;">
-            <button type="button" class="circle-icon-btn" data-action="edit-template" data-id="${tpl.id}">${ICONS.edit}</button>
-            <button type="button" class="circle-icon-btn" data-action="delete-template" data-id="${tpl.id}">${ICONS.trash}</button>
+            <button type="button" class="circle-icon-btn" data-action="edit-exercise" data-id="${exo.id}" title="Modifier">${ICONS.edit}</button>
+            <button type="button" class="circle-icon-btn" data-action="delete-exercise" data-id="${exo.id}" title="Supprimer">${ICONS.trash}</button>
           </div>
         </div>
-        <div>${exoLines || '<span style="color:var(--text-tertiary); font-size:0.82rem;">Aucun exercice</span>'}</div>
-      </div>
-    `;
-  }).join('');
-
-  const exercisesHtml = state.exercises.map((exo) => `
-    <div class="card" style="padding:15px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-      <div>
-        <div style="font-weight:800; font-size:0.96rem; display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
-          <span>${escapeHtml(exo.name)}</span>
-          <span class="badge badge-muscle">${escapeHtml(exo.muscle)}</span>
-          <span class="badge ${exo.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">
-            ${exo.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}
-          </span>
-        </div>
-        ${exo.note ? `<div style="font-size:0.78rem; color:var(--text-secondary); margin-top:5px;">${escapeHtml(exo.note)}</div>` : ''}
-      </div>
-      <button type="button" class="circle-icon-btn" data-action="edit-exercise" data-id="${exo.id}">${ICONS.edit}</button>
-    </div>
-  `).join('');
+      `).join('');
 
   container.innerHTML = `
     <div class="section-header">
       <span class="section-title">Mes Séances Types</span>
-      <button type="button" class="btn btn-primary btn-sm" data-action="create-template">+ Créer</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="create-template">+ Nouvelle séance</button>
     </div>
     ${tplListHtml}
 
     <div class="section-header" style="margin-top:28px;">
-      <span class="section-title">Exercices (${state.exercises.length})</span>
-      <button type="button" class="btn btn-secondary btn-sm" data-action="create-exercise">+ Nouvel exo</button>
+      <span class="section-title">Mes Exercices (${state.exercises.length})</span>
     </div>
+
+    <!-- Ultra-Fast Inline Exercise Adder -->
+    <form id="quick-add-exo-form" class="quick-add-exo-bar">
+      <div class="quick-add-top">
+        <input type="text" id="quick-exo-name" class="quick-add-input" placeholder="Nom du nouvel exercice (ex: Développé couché)..." required />
+      </div>
+      <div class="quick-add-bottom">
+        <button type="button" id="quick-exo-uni-btn" class="uni-pill-toggle ${state.ui.quickAddUni ? 'is-uni' : ''}">
+          ${state.ui.quickAddUni ? '🦿 Unilatéral (G / D séparés)' : '🏋️ Bilatéral (2 côtés)'}
+        </button>
+        <button type="submit" class="btn btn-primary btn-sm">+ Ajouter</button>
+      </div>
+    </form>
+
     ${exercisesHtml}
   `;
+
+  const uniBtn = document.getElementById('quick-exo-uni-btn');
+  if (uniBtn) {
+    uniBtn.addEventListener('click', () => {
+      state.ui.quickAddUni = !state.ui.quickAddUni;
+      renderTemplatesTab();
+      const inp = document.getElementById('quick-exo-name');
+      if (inp) inp.focus();
+    });
+  }
+
+  const quickForm = document.getElementById('quick-add-exo-form');
+  if (quickForm) {
+    quickForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = document.getElementById('quick-exo-name');
+      const name = inp.value.trim();
+      if (!name) return;
+      findOrCreateExerciseByName(name, state.ui.quickAddUni, 90);
+      state.ui.quickAddUni = false;
+      saveState();
+      renderTemplatesTab();
+      showToast(`"${name}" ajouté !`);
+    });
+  }
 }
 
 /* ==========================================================================
@@ -1037,7 +994,12 @@ function renderStatsTab() {
   const container = document.getElementById('stats-container');
   const currentExo = getExercise(state.ui.selectedStatExoId) || state.exercises[0];
   if (!currentExo) {
-    container.innerHTML = `<div class="card">Ajoute un exercice d'abord.</div>`;
+    container.innerHTML = `
+      <div class="card" style="text-align:center; padding:32px 20px;">
+        <div style="font-weight:800; font-size:1.05rem; margin-bottom:6px;">Aucun exercice pour l'instant</div>
+        <p style="font-size:0.84rem; color:var(--text-secondary);">Crée tes exercices dans l'onglet <strong>Programmes</strong> et valide ta première séance pour suivre tes statistiques !</p>
+      </div>
+    `;
     return;
   }
 
@@ -1333,7 +1295,7 @@ function renderSettingsTab() {
 }
 
 /* ==========================================================================
-   Modals
+   Modals (Ultra-Fast Programme Builder with Direct Exercise Typing)
    ========================================================================== */
 
 function openModal(title, bodyHtml) {
@@ -1352,19 +1314,7 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
     <form id="exo-form">
       <div class="form-group">
         <label class="form-label">Nom de l'exercice</label>
-        <input type="text" name="name" class="form-input" required placeholder="Ex: Curl Marteau Haltères" value="${escapeAttr(existing ? existing.name : '')}" />
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Muscle</label>
-          <select name="muscle" class="form-select">
-            ${['Pectoraux', 'Dos', 'Épaules', 'Biceps', 'Triceps', 'Quadriceps', 'Ischios', 'Fessiers / Quadris', 'Mollets', 'Abdos'].map((m) => `<option value="${m}" ${existing && existing.muscle === m ? 'selected' : ''}>${m}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Repos (sec)</label>
-          <input type="number" name="defaultRest" class="form-input" value="${existing ? existing.defaultRest : 90}" />
-        </div>
+        <input type="text" name="name" class="form-input" required placeholder="Ex: Développé couché haltères" value="${escapeAttr(existing ? existing.name : '')}" />
       </div>
       <div class="form-group">
         <div class="toggle-row">
@@ -1375,9 +1325,15 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
           <input type="checkbox" name="unilateral" ${existing && existing.unilateral ? 'checked' : ''} style="width:22px; height:22px; accent-color:var(--volt);" />
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Note de réglage</label>
-        <input type="text" name="note" class="form-input" placeholder="Ex: Siège cran 4, poulie basse" value="${escapeAttr(existing ? existing.note || '' : '')}" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Repos par défaut (sec)</label>
+          <input type="number" name="defaultRest" class="form-input" value="${existing ? existing.defaultRest : 90}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Note de réglage</label>
+          <input type="text" name="note" class="form-input" placeholder="Siège 4, poulie 2..." value="${escapeAttr(existing ? existing.note || '' : '')}" />
+        </div>
       </div>
       <button type="submit" class="btn btn-primary btn-block">Enregistrer</button>
     </form>
@@ -1391,7 +1347,6 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
 
     if (existing) {
       existing.name = name;
-      existing.muscle = fd.get('muscle');
       existing.defaultRest = parseInt(fd.get('defaultRest')) || 90;
       existing.unilateral = fd.get('unilateral') === 'on';
       existing.note = fd.get('note').trim();
@@ -1399,7 +1354,7 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
       const newExo = {
         id: uid('ex'),
         name,
-        muscle: fd.get('muscle'),
+        muscle: 'Général',
         defaultRest: parseInt(fd.get('defaultRest')) || 90,
         unilateral: fd.get('unilateral') === 'on',
         note: fd.get('note').trim()
@@ -1415,73 +1370,126 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
   });
 }
 
+// Frictionless Programme Builder: type any exercise name directly on each line!
 function openTemplateModal(templateId = null) {
   const existing = templateId ? state.templates.find((t) => t.id === templateId) : null;
   let draftName = existing ? existing.name : '';
-  let draftItems = existing ? JSON.parse(JSON.stringify(existing.items)) : [
-    { exerciseId: state.exercises[0]?.id || '', setsCount: 3, targetReps: '8-12', restSeconds: 90 }
-  ];
 
-  function renderModalContent() {
-    const itemsHtml = draftItems.map((it, idx) => {
-      const opts = state.exercises.map((ex) => `
-        <option value="${ex.id}" ${ex.id === it.exerciseId ? 'selected' : ''}>
-          ${escapeHtml(ex.name)} ${ex.unilateral ? '(G/D)' : ''}
-        </option>
-      `).join('');
+  // Each item holds exoName & unilateral directly so you can type new exercises on the fly!
+  let draftItems = existing
+    ? existing.items.map((it) => {
+        const ex = getExercise(it.exerciseId);
+        return {
+          exoName: ex ? ex.name : '',
+          unilateral: ex ? !!ex.unilateral : false,
+          setsCount: it.setsCount || 3,
+          targetReps: it.targetReps || '8-12',
+          restSeconds: it.restSeconds || 90
+        };
+      })
+    : [
+        { exoName: '', unilateral: false, setsCount: 3, targetReps: '8-10', restSeconds: 90 }
+      ];
 
-      return `
-        <div style="background:var(--surface-2); border-radius:22px; padding:14px; margin-bottom:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:800; font-size:0.75rem; color:var(--volt);">EXERCICE 0${idx + 1}</span>
-            <div style="display:flex; gap:4px;">
-              ${idx > 0 ? `<button type="button" class="circle-icon-btn tpl-move-up" data-idx="${idx}">↑</button>` : ''}
-              ${idx < draftItems.length - 1 ? `<button type="button" class="circle-icon-btn tpl-move-down" data-idx="${idx}">↓</button>` : ''}
-              <button type="button" class="circle-icon-btn tpl-remove-item" data-idx="${idx}">${ICONS.close}</button>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:10px;">
-            <select class="form-select tpl-exo-select" data-idx="${idx}" style="background:var(--surface-3);">${opts}</select>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-            <div>
-              <label class="form-label" style="font-size:0.68rem;">Séries</label>
-              <input type="number" class="form-input tpl-sets-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.setsCount}" min="1" max="15" />
-            </div>
-            <div>
-              <label class="form-label" style="font-size:0.68rem;">Reps</label>
-              <input type="text" class="form-input tpl-reps-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${escapeAttr(it.targetReps)}" />
-            </div>
-            <div>
-              <label class="form-label" style="font-size:0.68rem;">Repos (s)</label>
-              <input type="number" class="form-input tpl-rest-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.restSeconds || 90}" step="15" />
-            </div>
+  function renderModalContent(focusIndex = null) {
+    const datalistOptions = state.exercises.map(
+      (ex) => `<option value="${escapeAttr(ex.name)}"></option>`
+    ).join('');
+
+    const itemsHtml = draftItems.map((it, idx) => `
+      <div style="background:var(--surface-2); border-radius:22px; padding:14px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-weight:800; font-size:0.74rem; color:var(--volt);">EXERCICE 0${idx + 1}</span>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <button type="button" class="uni-pill-toggle tpl-toggle-uni ${it.unilateral ? 'is-uni' : ''}" data-idx="${idx}" style="padding:5px 10px; font-size:0.7rem; background:var(--surface-3);">
+              ${it.unilateral ? '🦿 Unilatéral G/D' : '🏋️ Bilatéral'}
+            </button>
+            ${idx > 0 ? `<button type="button" class="circle-icon-btn tpl-move-up" style="width:28px; height:28px;" data-idx="${idx}">↑</button>` : ''}
+            ${idx < draftItems.length - 1 ? `<button type="button" class="circle-icon-btn tpl-move-down" style="width:28px; height:28px;" data-idx="${idx}">↓</button>` : ''}
+            ${draftItems.length > 1 ? `<button type="button" class="circle-icon-btn tpl-remove-item" style="width:28px; height:28px;" data-idx="${idx}">${ICONS.close}</button>` : ''}
           </div>
         </div>
-      `;
-    }).join('');
 
-    openModal(existing ? 'Modifier la séance' : 'Nouvelle séance', `
+        <div class="form-group" style="margin-bottom:10px;">
+          <input
+            type="text"
+            list="existing-exos-datalist"
+            class="form-input tpl-exo-name-input"
+            data-idx="${idx}"
+            placeholder="Tape le nom de l'exercice (ex: Tirage vertical)..."
+            value="${escapeAttr(it.exoName)}"
+            style="background:var(--surface-3); padding:12px 14px;"
+          />
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div>
+            <label class="form-label" style="font-size:0.68rem;">Séries</label>
+            <input type="number" class="form-input tpl-sets-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.setsCount}" min="1" max="15" />
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.68rem;">Reps cible</label>
+            <input type="text" class="form-input tpl-reps-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${escapeAttr(it.targetReps)}" placeholder="8-12" />
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.68rem;">Repos (s)</label>
+            <input type="number" class="form-input tpl-rest-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.restSeconds || 90}" step="15" />
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    openModal(existing ? 'Modifier la séance' : 'Créer une séance', `
+      <datalist id="existing-exos-datalist">${datalistOptions}</datalist>
       <div class="form-group">
-        <label class="form-label">Nom de la séance</label>
-        <input type="text" id="tpl-name-input" class="form-input" placeholder="Ex: Push A" value="${escapeAttr(draftName)}" />
+        <label class="form-label">Nom de la séance (ex: Push, Pull, Legs...)</label>
+        <input type="text" id="tpl-name-input" class="form-input" placeholder="Ex: Séance Push" value="${escapeAttr(draftName)}" />
       </div>
       <div id="tpl-items-wrap">${itemsHtml}</div>
-      <div style="display:flex; gap:8px; margin-bottom:16px;">
-        <button type="button" class="btn btn-secondary btn-sm" id="tpl-add-exo-btn" style="flex:1;">+ Ajouter un exo</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="tpl-create-new-exo-btn">+ Créer un exo</button>
-      </div>
-      <button type="button" class="btn btn-primary btn-block" id="tpl-save-btn">Enregistrer la séance</button>
+      <button type="button" class="btn btn-secondary btn-block" id="tpl-add-exo-btn" style="margin-bottom:12px;">
+        + Ajouter un exercice à la séance
+      </button>
+      <button type="button" class="btn btn-primary btn-block" id="tpl-save-btn">
+        Enregistrer la séance
+      </button>
     `);
 
-    document.getElementById('tpl-name-input').addEventListener('input', (e) => { draftName = e.target.value; });
+    if (focusIndex !== null) {
+      const targetInput = document.querySelector(`.tpl-exo-name-input[data-idx="${focusIndex}"]`);
+      if (targetInput) targetInput.focus();
+    }
 
-    document.querySelectorAll('.tpl-exo-select').forEach((el) => {
-      el.addEventListener('change', (e) => {
+    document.getElementById('tpl-name-input').addEventListener('input', (e) => {
+      draftName = e.target.value;
+    });
+
+    document.querySelectorAll('.tpl-exo-name-input').forEach((el) => {
+      el.addEventListener('input', (e) => {
         const i = parseInt(e.target.dataset.idx);
-        const ex = getExercise(e.target.value);
-        draftItems[i].exerciseId = e.target.value;
-        if (ex) draftItems[i].restSeconds = ex.defaultRest || 90;
+        const val = e.target.value;
+        draftItems[i].exoName = val;
+        // If matches an existing exercise, auto-adopt its unilateral & rest setting
+        const match = state.exercises.find((ex) => ex.name.toLowerCase() === val.trim().toLowerCase());
+        if (match) {
+          draftItems[i].unilateral = !!match.unilateral;
+          draftItems[i].restSeconds = match.defaultRest || 90;
+        }
+      });
+
+      // Press Enter in exercise name to immediately add a new exercise line!
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          draftItems.push({ exoName: '', unilateral: false, setsCount: 3, targetReps: '8-12', restSeconds: 90 });
+          renderModalContent(draftItems.length - 1);
+        }
+      });
+    });
+
+    document.querySelectorAll('.tpl-toggle-uni').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const i = parseInt(e.currentTarget.dataset.idx);
+        draftItems[i].unilateral = !draftItems[i].unilateral;
         renderModalContent();
       });
     });
@@ -1522,44 +1530,53 @@ function openTemplateModal(templateId = null) {
     });
 
     document.getElementById('tpl-add-exo-btn').addEventListener('click', () => {
-      const firstExo = state.exercises[0];
       draftItems.push({
-        exerciseId: firstExo ? firstExo.id : '',
+        exoName: '',
+        unilateral: false,
         setsCount: 3,
         targetReps: '8-12',
-        restSeconds: firstExo ? firstExo.defaultRest : 90
+        restSeconds: 90
       });
-      renderModalContent();
-    });
-
-    document.getElementById('tpl-create-new-exo-btn').addEventListener('click', () => {
-      openExerciseModal(null, (newExo) => {
-        draftItems.push({
-          exerciseId: newExo.id,
-          setsCount: 3,
-          targetReps: '8-12',
-          restSeconds: newExo.defaultRest || 90
-        });
-        renderModalContent();
-      });
+      renderModalContent(draftItems.length - 1);
     });
 
     document.getElementById('tpl-save-btn').addEventListener('click', () => {
       const finalName = draftName.trim() || 'Ma Séance';
+      const resolvedItems = [];
+
+      draftItems.forEach((it) => {
+        const clean = (it.exoName || '').trim();
+        if (!clean) return;
+        const exoObj = findOrCreateExerciseByName(clean, it.unilateral, it.restSeconds);
+        if (exoObj) {
+          resolvedItems.push({
+            exerciseId: exoObj.id,
+            setsCount: parseInt(it.setsCount) || 3,
+            targetReps: it.targetReps || '8-12',
+            restSeconds: parseInt(it.restSeconds) || 90
+          });
+        }
+      });
+
+      if (resolvedItems.length === 0) {
+        showToast('Tape le nom d’au moins un exercice');
+        return;
+      }
+
       if (existing) {
         existing.name = finalName;
-        existing.items = draftItems;
+        existing.items = resolvedItems;
       } else {
-        state.templates.push({ id: uid('tpl'), name: finalName, items: draftItems });
+        state.templates.push({ id: uid('tpl'), name: finalName, items: resolvedItems });
       }
       saveState();
       closeModal();
       renderAll();
-      showToast('Séance enregistrée');
+      showToast('Séance et exercices enregistrés !');
     });
   }
 
-  renderModalContent();
+  renderModalContent(0);
 }
 
 function openWatchGuideModal() {
@@ -1747,6 +1764,12 @@ function setupEvents() {
       openExerciseModal(null);
     } else if (action === 'edit-exercise') {
       openExerciseModal(btn.dataset.id);
+    } else if (action === 'delete-exercise') {
+      if (confirm('Supprimer cet exercice ?')) {
+        state.exercises = state.exercises.filter((ex) => ex.id !== btn.dataset.id);
+        saveState();
+        renderTemplatesTab();
+      }
     } else if (action === 'set-stat-metric') {
       state.ui.statMetric = btn.dataset.metric;
       renderStatsTab();
@@ -1800,33 +1823,55 @@ function setupEvents() {
 }
 
 function openSwapOrAddExoModal(replaceIdx = null) {
-  const listHtml = state.exercises.map((ex) => `
-    <button type="button" class="card pick-live-exo-btn" data-id="${ex.id}" style="width:100%; text-align:left; padding:14px 16px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:var(--surface-2);">
-      <div>
+  let modalUni = false;
+
+  function renderPicker() {
+    const listHtml = state.exercises.map((ex) => `
+      <button type="button" class="card pick-live-exo-btn" data-id="${ex.id}" style="width:100%; text-align:left; padding:14px 16px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:var(--surface-2);">
         <div style="font-weight:800;">${escapeHtml(ex.name)}</div>
-        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">${escapeHtml(ex.muscle)}</div>
-      </div>
-      <span class="badge ${ex.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">${ex.unilateral ? 'G/D' : '2 côtés'}</span>
-    </button>
-  `).join('');
+        <span class="badge ${ex.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">${ex.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}</span>
+      </button>
+    `).join('');
 
-  openModal(replaceIdx !== null ? 'Remplacer l’exercice' : 'Ajouter un exercice', `
-    <div style="margin-bottom:12px;">
-      <button type="button" class="btn btn-secondary btn-block btn-sm" id="modal-new-exo-inline">+ Créer un nouvel exercice</button>
-    </div>
-    <div>${listHtml}</div>
-  `);
+    openModal(replaceIdx !== null ? 'Remplacer l’exercice' : 'Ajouter un exercice', `
+      <form id="modal-instant-exo-form" class="quick-add-exo-bar" style="background:var(--surface-2); margin-bottom:16px;">
+        <input type="text" id="modal-instant-exo-name" class="quick-add-input" style="background:var(--surface-3);" placeholder="Créer et ajouter direct (ex: Curl incliné)..." required />
+        <div class="quick-add-bottom">
+          <button type="button" id="modal-instant-uni" class="uni-pill-toggle ${modalUni ? 'is-uni' : ''}" style="background:var(--surface-3);">
+            ${modalUni ? '🦿 Unilatéral G/D' : '🏋️ Bilatéral'}
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">+ Créer & Choisir</button>
+        </div>
+      </form>
+      ${state.exercises.length > 0 ? `<div style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px; padding-left:4px;">OU CHOISIR DANS TES EXOS :</div>` : ''}
+      <div>${listHtml}</div>
+    `);
 
-  document.getElementById('modal-new-exo-inline').addEventListener('click', () => {
-    openExerciseModal(null, (created) => applyLiveExerciseSelection(created.id, replaceIdx));
-  });
-
-  document.querySelectorAll('.pick-live-exo-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      applyLiveExerciseSelection(btn.dataset.id, replaceIdx);
-      closeModal();
+    document.getElementById('modal-instant-uni').addEventListener('click', () => {
+      modalUni = !modalUni;
+      renderPicker();
     });
-  });
+
+    document.getElementById('modal-instant-exo-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('modal-instant-exo-name').value.trim();
+      if (!name) return;
+      const created = findOrCreateExerciseByName(name, modalUni, 90);
+      if (created) {
+        applyLiveExerciseSelection(created.id, replaceIdx);
+        closeModal();
+      }
+    });
+
+    document.querySelectorAll('.pick-live-exo-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        applyLiveExerciseSelection(btn.dataset.id, replaceIdx);
+        closeModal();
+      });
+    });
+  }
+
+  renderPicker();
 }
 
 function applyLiveExerciseSelection(exerciseId, replaceIdx) {

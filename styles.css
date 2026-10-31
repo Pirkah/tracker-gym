@@ -3,7 +3,6 @@
   --surface-1: #111113;
   --surface-2: #19191d;
   --surface-3: #232329;
-  --surface-glass: rgba(25, 25, 30, 0.72);
 
   --volt: #d0fd3e;
   --volt-dim: rgba(208, 253, 62, 0.14);
@@ -60,7 +59,6 @@ input[type="number"], input[type="text"] {
   user-select: text;
 }
 
-/* Remove ugly number spinners */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -78,35 +76,35 @@ input::-webkit-inner-spin-button {
   overflow: hidden;
 }
 
-/* Soft Organic Ambient Lighting */
+/* Soft Organic Ambient Lighting (enhances Liquid Glass refraction) */
 .ambient-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(85px);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .ambient-orb-1 {
-  width: 260px;
-  height: 260px;
-  background: radial-gradient(circle, rgba(208, 253, 62, 0.22), transparent 70%);
+  width: 270px;
+  height: 270px;
+  background: radial-gradient(circle, rgba(208, 253, 62, 0.24), transparent 70%);
   top: -80px;
-  right: -60px;
+  right: -50px;
 }
 
 .ambient-orb-2 {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.14), transparent 70%);
-  bottom: 60px;
-  left: -100px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), rgba(192, 132, 252, 0.12), transparent 70%);
+  bottom: -40px;
+  left: -80px;
 }
 
 /* Editorial iOS Header */
 .top-bar {
-  padding: calc(var(--safe-top) + 12px) 22px 10px;
+  padding: calc(var(--safe-top) + 12px) 22px 12px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -140,7 +138,7 @@ input::-webkit-inner-spin-button {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px 18px calc(145px + var(--safe-bottom));
+  padding: 10px 18px calc(150px + var(--safe-bottom));
   -webkit-overflow-scrolling: touch;
   z-index: 10;
 }
@@ -178,7 +176,7 @@ input::-webkit-inner-spin-button {
   color: var(--text-primary);
 }
 
-/* Organic Squircle Cards (No Boxy Borders!) */
+/* Organic Squircle Cards */
 .card {
   background: var(--surface-1);
   border-radius: var(--radius-card);
@@ -208,13 +206,14 @@ input::-webkit-inner-spin-button {
 }
 
 .hero-summary-title {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .hero-summary-val {
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #fff;
@@ -224,7 +223,7 @@ input::-webkit-inner-spin-button {
   color: var(--volt);
 }
 
-/* Workout Program Cards (Apple Fitness+ Inspired) */
+/* Workout Program Cards */
 .template-grid {
   display: flex;
   flex-direction: column;
@@ -268,7 +267,6 @@ input::-webkit-inner-spin-button {
   font-weight: 500;
 }
 
-/* Circular Play Action Button */
 .play-circle-btn {
   width: 48px;
   height: 48px;
@@ -290,7 +288,6 @@ input::-webkit-inner-spin-button {
   margin-left: 2px;
 }
 
-/* Soft Frosted Pills */
 .pill-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -393,7 +390,7 @@ input::-webkit-inner-spin-button {
 }
 
 /* ==========================================================================
-   Active Workout View (Ultra-Clean Capsule Layout)
+   Active Workout View
    ========================================================================== */
 
 .live-workout-banner {
@@ -421,7 +418,6 @@ input::-webkit-inner-spin-button {
   font-weight: 500;
 }
 
-/* Active Exercise Squircle Card */
 .card-active-exo {
   padding: 18px 16px;
   margin-bottom: 18px;
@@ -497,7 +493,6 @@ input::-webkit-inner-spin-button {
   background: var(--surface-3);
 }
 
-/* Sleek Pinned Note Pill */
 .exo-note-pill {
   background: rgba(255, 255, 255, 0.035);
   border-radius: 16px;
@@ -524,7 +519,7 @@ input::-webkit-inner-spin-button {
   color: var(--text-tertiary);
 }
 
-/* Spacious, Non-Boxy Set Capsules */
+/* Set Capsules */
 .sets-list {
   display: flex;
   flex-direction: column;
@@ -538,7 +533,7 @@ input::-webkit-inner-spin-button {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .set-capsule.completed {
@@ -546,7 +541,6 @@ input::-webkit-inner-spin-button {
   box-shadow: inset 0 0 0 1px rgba(208, 253, 62, 0.32);
 }
 
-/* Top micro-bar inside each set: Set Badge + Previous History Pill + RIR Pill */
 .set-capsule-top {
   display: flex;
   align-items: center;
@@ -601,7 +595,6 @@ input::-webkit-inner-spin-button {
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  transition: background 0.15s ease;
 }
 
 .prev-history-pill:active {
@@ -628,7 +621,6 @@ input::-webkit-inner-spin-button {
   color: var(--cyan);
 }
 
-/* Bottom tactile input bar inside each set: Weight Well + Reps Well(s) + Check Circle */
 .set-capsule-inputs {
   display: flex;
   align-items: center;
@@ -691,7 +683,6 @@ input::-webkit-inner-spin-button {
   color: var(--violet);
 }
 
-/* Circular Tactile Check Button */
 .check-circle-btn {
   width: 44px;
   height: 44px;
@@ -725,22 +716,85 @@ input::-webkit-inner-spin-button {
 }
 
 /* ==========================================================================
-   Dynamic Island Rest Timer
+   Quick Inline Exercise Creator & Programme Builder Cards
+   ========================================================================== */
+
+.quick-add-exo-bar {
+  background: var(--surface-1);
+  border-radius: 24px;
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.quick-add-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-add-input {
+  flex: 1;
+  background: var(--surface-2);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.quick-add-input:focus {
+  box-shadow: inset 0 0 0 1.5px var(--volt);
+}
+
+.quick-add-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uni-pill-toggle {
+  padding: 8px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.uni-pill-toggle.is-uni {
+  background: var(--violet-dim);
+  color: #e9d5ff;
+  box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.4);
+}
+
+/* ==========================================================================
+   Dynamic Island Rest Timer (Liquid Glass)
    ========================================================================== */
 
 .rest-timer-island {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(88px + var(--safe-bottom));
+  bottom: calc(92px + var(--safe-bottom));
   width: calc(100% - 28px);
   max-width: 470px;
-  background: rgba(14, 14, 17, 0.94);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(20, 20, 25, 0.76) 100%);
+  backdrop-filter: blur(34px) saturate(200%);
+  -webkit-backdrop-filter: blur(34px) saturate(200%);
   border-radius: var(--radius-pill);
   padding: 8px 12px 8px 10px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.75),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.08);
   z-index: 45;
   animation: islandPop 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
@@ -777,7 +831,7 @@ input::-webkit-inner-spin-button {
 
 .island-ring-bg {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.1);
+  stroke: rgba(255, 255, 255, 0.12);
   stroke-width: 3.5;
 }
 
@@ -797,7 +851,7 @@ input::-webkit-inner-spin-button {
 .island-label {
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.72);
   max-width: 115px;
   white-space: nowrap;
   overflow: hidden;
@@ -819,7 +873,7 @@ input::-webkit-inner-spin-button {
 }
 
 .island-pill-btn {
-  background: var(--surface-3);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   height: 32px;
   padding: 0 10px;
@@ -830,6 +884,7 @@ input::-webkit-inner-spin-button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .island-watch-btn {
@@ -850,15 +905,15 @@ input::-webkit-inner-spin-button {
 }
 
 /* ==========================================================================
-   Floating iOS Glass Pill Dock
+   iOS 26 TRUE LIQUID GLASS MAIN BAR (Refractive Specular Capsule)
    ========================================================================== */
 
 .dock-wrapper {
   position: fixed;
-  bottom: calc(10px + var(--safe-bottom));
+  bottom: calc(12px + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 32px);
+  width: calc(100% - 28px);
   max-width: 440px;
   z-index: 40;
   pointer-events: none;
@@ -866,29 +921,66 @@ input::-webkit-inner-spin-button {
 
 .floating-dock {
   pointer-events: auto;
-  background: rgba(22, 22, 26, 0.82);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  position: relative;
   border-radius: var(--radius-pill);
-  padding: 6px;
+  padding: 7px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* Multi-layer refractive Liquid Glass surface */
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.20) 0%,
+      rgba(255, 255, 255, 0.05) 38%,
+      rgba(18, 18, 22, 0.45) 68%,
+      rgba(208, 253, 62, 0.08) 100%
+    );
+  backdrop-filter: blur(36px) saturate(210%) brightness(1.08);
+  -webkit-backdrop-filter: blur(36px) saturate(210%) brightness(1.08);
+  /* Specular glass rim + deep floating elevation */
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.78),
+    0 4px 16px rgba(0, 0, 0, 0.45),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.45),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.14),
+    inset 1px 0 1px rgba(255, 255, 255, 0.22),
+    inset -1px 0 1px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+/* Top optical glare reflection across the Liquid Glass bar */
+.floating-dock::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 100%);
+  border-radius: 999px;
+  pointer-events: none;
 }
 
 .dock-item {
+  position: relative;
+  z-index: 2;
   border-radius: var(--radius-pill);
-  padding: 8px 4px;
+  padding: 9px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: var(--text-secondary);
-  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.67rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.24s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.dock-item:active {
+  transform: scale(0.92);
 }
 
 .dock-icon-wrap {
@@ -901,11 +993,27 @@ input::-webkit-inner-spin-button {
 .dock-item svg {
   width: 20px;
   height: 20px;
+  transition: transform 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
+/* Active Liquid Droplet Lens inside the Dock */
 .dock-item.active {
-  background: rgba(208, 253, 62, 0.14);
   color: var(--volt);
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(208, 253, 62, 0.16) 55%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.38),
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px rgba(208, 253, 62, 0.25);
+}
+
+.dock-item.active svg {
+  transform: translateY(-1px) scale(1.06);
+  filter: drop-shadow(0 0 8px rgba(208, 253, 62, 0.45));
 }
 
 .dock-live-dot {
@@ -1043,8 +1151,8 @@ input::-webkit-inner-spin-button {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.76);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 100;
   display: flex;
   align-items: flex-end;
@@ -1054,13 +1162,13 @@ input::-webkit-inner-spin-button {
 .modal-sheet {
   width: 100%;
   max-width: 520px;
-  max-height: 88dvh;
+  max-height: 90dvh;
   background: #141417;
   border-radius: 34px 34px 0 0;
   padding: 12px 20px calc(24px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   animation: sheetUp 0.26s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1124,14 +1232,15 @@ input::-webkit-inner-spin-button {
 }
 
 .toast {
-  background: rgba(24, 24, 28, 0.95);
-  backdrop-filter: blur(16px);
+  background: rgba(24, 24, 28, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: 11px 18px;
   border-radius: var(--radius-pill);
   font-size: 0.84rem;
   font-weight: 700;
   color: #fff;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   animation: smoothAppear 0.2s ease-out;
 }
 
