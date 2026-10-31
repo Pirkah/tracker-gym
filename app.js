@@ -1,12 +1,24 @@
 /* ==========================================================================
-   IronPulse — iOS Gym Tracker PWA
+   PULSE — Apple Fitness+ Inspired iOS Gym Tracker
    ========================================================================== */
 
 const STORAGE_KEY = 'ironpulse_data_v1';
 const IDB_NAME = 'IronPulseDB';
 const IDB_STORE = 'state';
 
-// Default Exercises & Sample Templates (with realistic history so Stats & Previous values work out of the box)
+// Clean Vector Icons
+const ICONS = {
+  play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7-11-7z"/></svg>`,
+  check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  swap: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>`,
+  chart: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 3 5-6"/></svg>`,
+  close: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
+  trash: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  edit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+  pin: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`,
+  history: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>`
+};
+
 const DEFAULT_EXERCISES = [
   { id: 'ex_bench_db', name: 'Développé Couché Haltères', muscle: 'Pectoraux', unilateral: false, defaultRest: 120, note: 'Banc à plat, omoplates serrées' },
   { id: 'ex_incline_machine', name: 'Développé Incliné Convergent', muscle: 'Pectoraux', unilateral: true, defaultRest: 120, note: 'Siège cran 4, poids indiqué par côté' },
@@ -24,7 +36,7 @@ const DEFAULT_EXERCISES = [
 const DEFAULT_TEMPLATES = [
   {
     id: 'tpl_push',
-    name: 'Push — Pecs, Épaules, Triceps',
+    name: 'Push — Pecs, Épaules & Triceps',
     items: [
       { exerciseId: 'ex_bench_db', setsCount: 3, targetReps: '8-10', restSeconds: 120 },
       { exerciseId: 'ex_incline_machine', setsCount: 3, targetReps: '8-12', restSeconds: 120 },
@@ -34,7 +46,7 @@ const DEFAULT_TEMPLATES = [
   },
   {
     id: 'tpl_pull',
-    name: 'Pull — Dos, Biceps',
+    name: 'Pull — Dos & Biceps',
     items: [
       { exerciseId: 'ex_lat_pulldown', setsCount: 3, targetReps: '8-10', restSeconds: 120 },
       { exerciseId: 'ex_row_uni', setsCount: 3, targetReps: '8-12', restSeconds: 90 },
@@ -60,7 +72,7 @@ function createSampleHistory() {
     {
       id: 'wk_demo_1',
       templateId: 'tpl_push',
-      name: 'Push — Pecs, Épaules, Triceps',
+      name: 'Push — Pecs, Épaules & Triceps',
       date: new Date(now - 7 * day).toISOString(),
       durationSec: 3420,
       exercises: [
@@ -96,7 +108,7 @@ function createSampleHistory() {
     {
       id: 'wk_demo_2',
       templateId: 'tpl_push',
-      name: 'Push — Pecs, Épaules, Triceps',
+      name: 'Push — Pecs, Épaules & Triceps',
       date: new Date(now - 3 * day).toISOString(),
       durationSec: 3600,
       exercises: [
@@ -142,7 +154,6 @@ function createSampleHistory() {
   ];
 }
 
-// Application State
 let state = {
   exercises: [],
   templates: [],
@@ -159,12 +170,10 @@ let state = {
   ui: {
     activeTab: 'workout',
     selectedStatExoId: 'ex_bench_db',
-    statMetric: 'maxWeight', // 'maxWeight' | 'e1rm' | 'volume' | 'asymmetry'
-    editingTemplateId: null
+    statMetric: 'maxWeight'
   }
 };
 
-// Rest Timer Runtime State
 let restTimer = {
   active: false,
   totalSec: 90,
@@ -176,11 +185,11 @@ let restTimer = {
 let workoutClockInterval = null;
 
 /* ==========================================================================
-   Persistence Layer (localStorage + IndexedDB + Free Cloud Sync)
+   Persistence (LocalStorage + IndexedDB + Cloud Sync)
    ========================================================================== */
 
 function openIDB() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!window.indexedDB) return resolve(null);
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = (e) => {
@@ -200,9 +209,7 @@ async function saveToIDB(dataObj) {
     if (!db) return;
     const tx = db.transaction(IDB_STORE, 'readwrite');
     tx.objectStore(IDB_STORE).put(JSON.stringify(dataObj), 'backup');
-  } catch (e) {
-    // Fallback silent
-  }
+  } catch {}
 }
 
 async function loadFromIDB() {
@@ -215,9 +222,7 @@ async function loadFromIDB() {
       req.onsuccess = () => {
         if (req.result) {
           try { resolve(JSON.parse(req.result)); } catch { resolve(null); }
-        } else {
-          resolve(null);
-        }
+        } else resolve(null);
       };
       req.onerror = () => resolve(null);
     });
@@ -236,9 +241,7 @@ function saveState(triggerCloud = false) {
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (err) {
-    console.error('Erreur localStorage', err);
-  }
+  } catch {}
   saveToIDB(payload);
   updateLiveWorkoutIndicators();
 
@@ -279,7 +282,7 @@ async function loadState() {
 async function syncToCloud(silent = false) {
   const url = (state.settings.cloudUrl || '').trim();
   if (!url) {
-    if (!silent) showToast('Configure une URL Cloud (ex: Firebase) d’abord.');
+    if (!silent) showToast('Configure une URL Cloud d’abord');
     return;
   }
   try {
@@ -299,18 +302,18 @@ async function syncToCloud(silent = false) {
     state.settings.lastCloudSync = new Date().toISOString();
     saveState(false);
     if (!silent) {
-      showToast('☁️ Sauvegarde Cloud réussie !');
+      showToast('Synchronisé sur le Cloud');
       renderSettingsTab();
     }
-  } catch (err) {
-    if (!silent) showToast('⚠️ Erreur Cloud : vérifie ton URL.');
+  } catch {
+    if (!silent) showToast('Erreur Cloud : vérifie ton URL');
   }
 }
 
 async function restoreFromCloud() {
   const url = (state.settings.cloudUrl || '').trim();
   if (!url) {
-    showToast('Renseigne ton URL Cloud d’abord.');
+    showToast('Renseigne ton URL Cloud d’abord');
     return;
   }
   try {
@@ -319,7 +322,7 @@ async function restoreFromCloud() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || !Array.isArray(data.exercises)) {
-      showToast('Aucune sauvegarde trouvée sur ce Cloud.');
+      showToast('Aucune sauvegarde trouvée');
       return;
     }
     state.exercises = data.exercises;
@@ -328,24 +331,22 @@ async function restoreFromCloud() {
     state.settings.lastCloudSync = new Date().toISOString();
     saveState(false);
     renderAll();
-    showToast('✅ Données restaurées depuis le Cloud !');
-  } catch (err) {
-    showToast('⚠️ Impossible de récupérer les données Cloud.');
+    showToast('Données restaurées depuis le Cloud');
+  } catch {
+    showToast('Impossible de récupérer les données');
   }
 }
 
 function normalizeCloudUrl(url) {
   let clean = url.replace(/\/+$/, '');
   if (clean.includes('firebaseio.com') || clean.includes('firebasedatabase.app')) {
-    if (!clean.endsWith('.json')) {
-      clean += '/ironpulse_backup.json';
-    }
+    if (!clean.endsWith('.json')) clean += '/ironpulse_backup.json';
   }
   return clean;
 }
 
 /* ==========================================================================
-   Helpers & Exercise Lookup
+   Helpers
    ========================================================================== */
 
 function uid(prefix = 'id') {
@@ -369,8 +370,7 @@ function formatDuration(sec) {
 
 function formatDateShort(iso) {
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+    return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
   } catch {
     return '';
   }
@@ -385,12 +385,10 @@ function showToast(msg, isPr = false) {
   setTimeout(() => {
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 220);
-  }, 3000);
+  }, 2800);
 }
 
-// Get previous session performance for a given exercise
 function getPreviousExercisePerf(exerciseId) {
-  // Search history from newest to oldest
   const sorted = [...state.history].sort((a, b) => new Date(b.date) - new Date(a.date));
   for (const wk of sorted) {
     const found = (wk.exercises || []).find((e) => e.exerciseId === exerciseId);
@@ -405,9 +403,8 @@ function getPreviousExercisePerf(exerciseId) {
   return null;
 }
 
-// Check if a newly completed set is a Personal Record (PR)
 function checkSetPR(exerciseId, setObj, isUnilateral) {
-  if (setObj.tag === 'W') return null; // Ignore warmup sets for PRs
+  if (setObj.tag === 'W') return null;
   const weight = parseFloat(setObj.weight) || 0;
   const reps = isUnilateral
     ? Math.max(parseInt(setObj.repsLeft) || 0, parseInt(setObj.repsRight) || 0)
@@ -446,7 +443,7 @@ function checkSetPR(exerciseId, setObj, isUnilateral) {
 }
 
 /* ==========================================================================
-   Audio & Apple Watch Rest Timer Engine
+   Dynamic Island Rest Timer & Apple Watch Relay
    ========================================================================== */
 
 function playTimerBeep() {
@@ -468,15 +465,12 @@ function playTimerBeep() {
       osc.start(ctx.currentTime + idx * 0.14);
       osc.stop(ctx.currentTime + idx * 0.14 + 0.26);
     });
-  } catch (e) {
-    // Ignore audio context block
-  }
+  } catch {}
 }
 
 function triggerWatchShortcut(seconds) {
   const shortcutName = encodeURIComponent(state.settings.watchShortcutName || 'IronPulse Timer');
-  const url = `shortcuts://run-shortcut?name=${shortcutName}&input=text&text=${encodeURIComponent(String(seconds))}`;
-  window.location.href = url;
+  window.location.href = `shortcuts://run-shortcut?name=${shortcutName}&input=text&text=${encodeURIComponent(String(seconds))}`;
 }
 
 function startRestTimer(seconds, exoName = 'Repos') {
@@ -488,7 +482,7 @@ function startRestTimer(seconds, exoName = 'Repos') {
 
   const bar = document.getElementById('rest-timer-bar');
   bar.classList.remove('hidden');
-  document.getElementById('rest-timer-exo-name').textContent = `Repos • ${exoName}`;
+  document.getElementById('rest-timer-exo-name').textContent = exoName;
 
   if (restTimer.intervalId) clearInterval(restTimer.intervalId);
   tickRestTimer();
@@ -510,8 +504,12 @@ function tickRestTimer() {
   }
 
   document.getElementById('rest-timer-display').textContent = formatDuration(remainingSec);
-  const pct = Math.max(0, Math.min(100, (remainingMs / (restTimer.totalSec * 1000)) * 100));
-  document.getElementById('rest-timer-progress').style.width = `${pct}%`;
+  const circumference = 94.2;
+  const ratio = Math.max(0, Math.min(1, remainingMs / (restTimer.totalSec * 1000)));
+  const ring = document.getElementById('rest-timer-ring');
+  if (ring) {
+    ring.style.strokeDashoffset = String(circumference * (1 - ratio));
+  }
 }
 
 function adjustRestTimer(deltaSec) {
@@ -535,14 +533,13 @@ function finishRestTimer() {
   stopRestTimer();
   playTimerBeep();
   if (navigator.vibrate) navigator.vibrate([250, 120, 250]);
-  showToast(`⏱️ Repos terminé (${exoName}) — À toi de jouer !`, true);
+  showToast(`Repos terminé • ${exoName}`, true);
 
-  // Trigger iOS Web Notification if granted (makes Apple Watch vibrate when iPhone screen is locked)
   if ('Notification' in window && Notification.permission === 'granted') {
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then((reg) => {
-        reg.showNotification('⏱️ Repos terminé !', {
-          body: `C'est l'heure de ta prochaine série sur ${exoName}.`,
+        reg.showNotification('Repos terminé', {
+          body: `Prêt pour ta série sur ${exoName}`,
           icon: 'icon.svg',
           tag: 'ironpulse-rest-timer',
           renotify: true
@@ -553,7 +550,7 @@ function finishRestTimer() {
 }
 
 /* ==========================================================================
-   Active Workout Engine (Tab 1)
+   Tab 1: Workout Launcher & Active Workout
    ========================================================================== */
 
 function startWorkoutFromTemplate(templateId) {
@@ -568,10 +565,12 @@ function startWorkoutFromTemplate(templateId) {
     const count = parseInt(item.setsCount) || 3;
 
     for (let i = 0; i < count; i++) {
-      const prevSet = prev && prev.sets[i] ? prev.sets[i] : (prev && prev.sets.length ? prev.sets[prev.sets.length - 1] : null);
+      const prevSet = prev && prev.sets[i]
+        ? prev.sets[i]
+        : (prev && prev.sets.length ? prev.sets[prev.sets.length - 1] : null);
       sets.push({
         id: uid('set'),
-        tag: String(i + 1), // '1', '2', 'W', 'D', 'F'
+        tag: String(i + 1),
         weight: prevSet && prevSet.weight !== undefined ? String(prevSet.weight) : '',
         reps: !isUni && prevSet && prevSet.reps !== undefined ? String(prevSet.reps) : '',
         repsLeft: isUni && prevSet && prevSet.repsLeft !== undefined ? String(prevSet.repsLeft) : '',
@@ -603,7 +602,7 @@ function startWorkoutFromTemplate(templateId) {
   saveState();
   switchTab('workout');
   renderWorkoutTab();
-  showToast(`🔥 Séance "${tpl.name}" lancée !`);
+  showToast(`${tpl.name} démarrée`, true);
 }
 
 function startEmptyWorkout() {
@@ -646,9 +645,10 @@ function updateHeaderClock() {
   }
   const elapsedSec = Math.max(0, Math.floor((Date.now() - state.activeWorkout.startedAt) / 1000));
   topActions.innerHTML = `
-    <span class="badge badge-bilateral" style="font-size:0.8rem; padding:5px 10px;">
-      ⏱️ ${formatDuration(elapsedSec)}
-    </span>
+    <div style="background:rgba(208,253,62,0.14); color:var(--volt); padding:7px 14px; border-radius:999px; font-size:0.84rem; font-weight:800; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:6px;">
+      <span style="width:7px; height:7px; border-radius:50%; background:var(--volt);"></span>
+      ${formatDuration(elapsedSec)}
+    </div>
   `;
 }
 
@@ -662,27 +662,41 @@ function renderWorkoutTab() {
 }
 
 function renderWorkoutLauncher(container) {
+  const totalSessions = state.history.length;
+  const totalVolumeAll = state.history.reduce((sum, wk) => {
+    return sum + (wk.exercises || []).reduce((s2, ex) => {
+      return s2 + (ex.sets || []).filter((st) => st.done).reduce((s3, st) => {
+        const w = parseFloat(st.weight) || 0;
+        const r = ex.unilateral ? ((parseInt(st.repsLeft) || 0) + (parseInt(st.repsRight) || 0)) : (parseInt(st.reps) || 0);
+        return s3 + w * r;
+      }, 0);
+    }, 0);
+  }, 0);
+
   const templatesHtml = state.templates.map((tpl) => {
     const pills = tpl.items.map((it) => {
       const exo = getExercise(it.exerciseId);
       if (!exo) return '';
-      return `<span class="template-exo-pill">${exo.name} (${it.setsCount}×${it.targetReps}) ${exo.unilateral ? '• 1 bras/côté' : ''}</span>`;
+      return `
+        <span class="soft-pill">
+          ${escapeHtml(exo.name)}
+          <strong>${it.setsCount}×${escapeHtml(it.targetReps)}</strong>
+        </span>
+      `;
     }).join('');
 
     return `
-      <div class="template-launch-card">
-        <div class="template-launch-header">
+      <div class="workout-program-card" data-action="start-template" data-id="${tpl.id}">
+        <div class="workout-program-top">
           <div>
-            <div class="template-launch-title">${escapeHtml(tpl.name)}</div>
-            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">
-              ${tpl.items.length} exercices pré-configurés
-            </div>
+            <div class="workout-program-title">${escapeHtml(tpl.name)}</div>
+            <div class="workout-program-sub">${tpl.items.length} exercices programmés</div>
           </div>
-          <button type="button" class="btn btn-primary btn-sm" data-action="start-template" data-id="${tpl.id}">
-            Démarrer ▶
+          <button type="button" class="play-circle-btn" data-action="start-template" data-id="${tpl.id}">
+            ${ICONS.play}
           </button>
         </div>
-        <div class="template-exo-preview">${pills}</div>
+        <div class="pill-cloud">${pills}</div>
       </div>
     `;
   }).join('');
@@ -696,32 +710,40 @@ function renderWorkoutLauncher(container) {
     : recentHistory.map((wk) => {
         const totalSets = (wk.exercises || []).reduce((acc, ex) => acc + (ex.sets || []).filter((s) => s.done).length, 0);
         return `
-          <div class="card" style="padding:12px 14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <div style="font-weight:700; font-size:0.95rem;">${escapeHtml(wk.name)}</div>
-              <div style="font-size:0.76rem; color:var(--text-secondary); margin-top:3px;">
-                📅 ${formatDateShort(wk.date)} • ${ (wk.exercises || []).length } exos • ${totalSets} séries validées
+          <div class="card" style="padding:16px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="cursor:pointer; flex:1;" data-action="view-history-wk" data-id="${wk.id}">
+              <div style="font-weight:800; font-size:0.98rem; letter-spacing:-0.01em;">${escapeHtml(wk.name)}</div>
+              <div style="font-size:0.76rem; color:var(--text-secondary); margin-top:4px; font-weight:500;">
+                ${formatDateShort(wk.date)} • ${(wk.exercises || []).length} exos • ${totalSets} séries
               </div>
             </div>
             <div style="display:flex; gap:6px;">
-              <button type="button" class="icon-btn" data-action="view-history-wk" data-id="${wk.id}" title="Détails">👁️</button>
-              <button type="button" class="icon-btn" data-action="delete-history-wk" data-id="${wk.id}" title="Supprimer">🗑️</button>
+              <button type="button" class="circle-icon-btn" data-action="delete-history-wk" data-id="${wk.id}" title="Supprimer">
+                ${ICONS.trash}
+              </button>
             </div>
           </div>
         `;
       }).join('');
 
   container.innerHTML = `
+    <div class="hero-summary">
+      <div class="hero-summary-left">
+        <span class="hero-summary-title">BILAN GLOBAL</span>
+        <div class="hero-summary-val"><span>${totalSessions}</span> séances • ${(totalVolumeAll / 1000).toFixed(1)}t soulevées</div>
+      </div>
+      <button type="button" class="btn btn-ghost" data-action="start-empty-workout">+ Libre</button>
+    </div>
+
     <div class="section-header">
-      <span class="section-title">Choisir ma séance du jour</span>
-      <button type="button" class="btn btn-ghost" data-action="start-empty-workout">+ Séance libre</button>
+      <span class="section-title">Lancer ma séance</span>
     </div>
     <div class="template-grid">
       ${templatesHtml}
     </div>
 
-    <div class="section-header" style="margin-top:24px;">
-      <span class="section-title">Dernières séances effectuées</span>
+    <div class="section-header" style="margin-top:28px;">
+      <span class="section-title">Récemment</span>
     </div>
     ${historyHtml}
   `;
@@ -749,140 +771,109 @@ function renderActiveWorkout(container) {
     const isUni = !!wExo.unilateral;
     const prevPerf = getPreviousExercisePerf(wExo.exerciseId);
 
-    const gridClass = isUni ? 'sets-grid-unilateral' : 'sets-grid-bilateral';
-    const headerRow = isUni
-      ? `
-        <div class="sets-header ${gridClass}">
-          <span>Série</span>
-          <span>Dernière fois</span>
-          <span>Kg/Côté</span>
-          <span style="color:#93c5fd;">Reps G</span>
-          <span style="color:#d8b4fe;">Reps D</span>
-          <span>RIR</span>
-          <span>✓</span>
-        </div>
-      `
-      : `
-        <div class="sets-header ${gridClass}">
-          <span>Série</span>
-          <span>Dernière fois</span>
-          <span>Poids</span>
-          <span>Reps</span>
-          <span>RIR</span>
-          <span>✓</span>
-        </div>
-      `;
-
     let normalCounter = 0;
     const setsHtml = wExo.sets.map((s, setIdx) => {
-      if (!['W', 'D', 'F'].includes(s.tag)) {
-        normalCounter++;
-      }
-      const displayTag = ['W', 'D', 'F'].includes(s.tag) ? s.tag : String(normalCounter);
-      const tagClass = ['W', 'D', 'F'].includes(s.tag) ? `set-tag-${s.tag}` : '';
+      if (!['W', 'D', 'F'].includes(s.tag)) normalCounter++;
+      const displayTag = ['W', 'D', 'F'].includes(s.tag) ? s.tag : `S${normalCounter}`;
+      const tagClass = ['W', 'D', 'F'].includes(s.tag) ? `set-badge-${s.tag}` : '';
 
-      // Lookup matching previous set
       const prevSet = prevPerf && prevPerf.sets[setIdx]
         ? prevPerf.sets[setIdx]
         : (prevPerf && prevPerf.sets.length ? prevPerf.sets[prevPerf.sets.length - 1] : null);
 
-      let prevLabelMain = '—';
-      let prevLabelSub = 'Tap = copier';
+      let prevText = 'Première fois';
       if (prevSet) {
         if (prevPerf.unilateral || (prevSet.repsLeft !== undefined && prevSet.repsLeft !== '')) {
-          prevLabelMain = `${prevSet.weight}kg • G:${prevSet.repsLeft || 0} D:${prevSet.repsRight || 0}`;
+          prevText = `Dernière : <strong>${prevSet.weight}kg</strong> (G:${prevSet.repsLeft || 0} • D:${prevSet.repsRight || 0})`;
         } else {
-          prevLabelMain = `${prevSet.weight} kg × ${prevSet.reps}`;
+          prevText = `Dernière : <strong>${prevSet.weight}kg × ${prevSet.reps}</strong>`;
         }
-        if (prevSet.rir) prevLabelSub = `RIR ${prevSet.rir}`;
-      } else {
-        prevLabelSub = '1ère fois';
       }
 
-      const rirDisplay = s.rir ? `@${s.rir}` : 'RIR';
+      const rirDisplay = s.rir ? `RIR ${s.rir}` : 'RIR';
 
-      if (isUni) {
-        return `
-          <div class="set-row ${gridClass} ${s.done ? 'completed' : ''}" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-            <button type="button" class="set-tag-btn ${tagClass}" data-action="cycle-set-tag" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" title="Changer type (Normal / Échauffement W / Drop D / Échec F)">
-              ${displayTag}
-            </button>
-            <button type="button" class="prev-perf-btn" data-action="copy-prev-set" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              <span class="prev-perf-main">${prevLabelMain}</span>
-              <span class="prev-perf-sub">${ s.prBadge ? `🏆 ${s.prBadge}` : prevLabelSub }</span>
-            </button>
-            <input type="number" step="0.5" inputmode="decimal" class="gym-input" placeholder="kg" value="${escapeAttr(s.weight)}" data-input="weight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-            <input type="number" inputmode="numeric" class="gym-input gym-input-left" placeholder="G" value="${escapeAttr(s.repsLeft)}" data-input="repsLeft" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-            <input type="number" inputmode="numeric" class="gym-input gym-input-right" placeholder="D" value="${escapeAttr(s.repsRight)}" data-input="repsRight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-            <button type="button" class="rir-btn ${s.rir ? 'has-rir' : ''}" data-action="cycle-rir" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
+      return `
+        <div class="set-capsule ${s.done ? 'completed' : ''}" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
+          <div class="set-capsule-top">
+            <div class="set-capsule-left">
+              <button type="button" class="set-badge-pill ${tagClass}" data-action="cycle-set-tag" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
+                ${displayTag}
+              </button>
+              <button type="button" class="prev-history-pill" data-action="copy-prev-set" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
+                ${ICONS.history}
+                <span>${s.prBadge ? `🏆 <strong>${s.prBadge}</strong>` : prevText}</span>
+              </button>
+            </div>
+            <button type="button" class="rir-pill-btn ${s.rir ? 'has-rir' : ''}" data-action="cycle-rir" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
               ${rirDisplay}
             </button>
-            <button type="button" class="check-set-btn ${s.done ? 'checked' : ''}" data-action="toggle-set-done" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              ✓
+          </div>
+
+          <div class="set-capsule-inputs">
+            <label class="input-well">
+              <input type="number" step="0.5" inputmode="decimal" class="well-input" placeholder="0" value="${escapeAttr(s.weight)}" data-input="weight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
+              <span class="well-unit">${isUni ? 'kg/côté' : 'kg'}</span>
+            </label>
+
+            ${isUni ? `
+              <label class="input-well input-well-left">
+                <input type="number" inputmode="numeric" class="well-input" placeholder="0" value="${escapeAttr(s.repsLeft)}" data-input="repsLeft" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
+                <span class="well-unit well-unit-left">G</span>
+              </label>
+              <label class="input-well input-well-right">
+                <input type="number" inputmode="numeric" class="well-input" placeholder="0" value="${escapeAttr(s.repsRight)}" data-input="repsRight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
+                <span class="well-unit well-unit-right">D</span>
+              </label>
+            ` : `
+              <label class="input-well">
+                <input type="number" inputmode="numeric" class="well-input" placeholder="0" value="${escapeAttr(s.reps)}" data-input="reps" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
+                <span class="well-unit">reps</span>
+              </label>
+            `}
+
+            <button type="button" class="check-circle-btn ${s.done ? 'checked' : ''}" data-action="toggle-set-done" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
+              ${ICONS.check}
             </button>
           </div>
-        `;
-      } else {
-        return `
-          <div class="set-row ${gridClass} ${s.done ? 'completed' : ''}" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-            <button type="button" class="set-tag-btn ${tagClass}" data-action="cycle-set-tag" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              ${displayTag}
-            </button>
-            <button type="button" class="prev-perf-btn" data-action="copy-prev-set" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              <span class="prev-perf-main">${prevLabelMain}</span>
-              <span class="prev-perf-sub">${ s.prBadge ? `🏆 ${s.prBadge}` : prevLabelSub }</span>
-            </button>
-            <input type="number" step="0.5" inputmode="decimal" class="gym-input" placeholder="kg" value="${escapeAttr(s.weight)}" data-input="weight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-            <input type="number" inputmode="numeric" class="gym-input" placeholder="reps" value="${escapeAttr(s.reps)}" data-input="reps" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-            <button type="button" class="rir-btn ${s.rir ? 'has-rir' : ''}" data-action="cycle-rir" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              ${rirDisplay}
-            </button>
-            <button type="button" class="check-set-btn ${s.done ? 'checked' : ''}" data-action="toggle-set-done" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
-              ✓
-            </button>
-          </div>
-        `;
-      }
+        </div>
+      `;
     }).join('');
 
     return `
       <div class="card card-active-exo">
         <div class="exo-header">
-          <div class="exo-title-wrap">
-            <div class="exo-title">
-              <span>${escapeHtml(exo.name)}</span>
-              <button type="button" class="badge ${isUni ? 'badge-unilateral' : 'badge-bilateral'}" data-action="toggle-live-unilateral" data-exo-idx="${exoIdx}" style="cursor:pointer;">
-                ${isUni ? '🦿 Unilatéral (G/D)' : '🏋️ Bilatéral'}
-              </button>
-            </div>
+          <div style="flex:1;">
+            <span class="exo-number-chip">EXERCICE ${exoIdx + 1}</span>
+            <div class="exo-title">${escapeHtml(exo.name)}</div>
             <div class="exo-submeta">
-              <span>🎯 Cible : <strong>${escapeHtml(wExo.targetReps)} reps</strong></span>
-              <span>•</span>
-              <span style="cursor:pointer; text-decoration:underline;" data-action="edit-live-rest" data-exo-idx="${exoIdx}">
-                ⏱️ Repos : ${wExo.restSeconds}s
-              </span>
+              <button type="button" class="badge ${isUni ? 'badge-unilateral' : 'badge-bilateral'}" data-action="toggle-live-unilateral" data-exo-idx="${exoIdx}" style="cursor:pointer;">
+                ${isUni ? 'Unilatéral G / D' : 'Bilatéral'}
+              </button>
+              <span class="meta-chip">Cible ${escapeHtml(wExo.targetReps)}</span>
+              <button type="button" class="meta-chip" data-action="edit-live-rest" data-exo-idx="${exoIdx}" style="cursor:pointer;">
+                Repos ${wExo.restSeconds}s
+              </button>
             </div>
           </div>
           <div class="exo-actions">
-            <button type="button" class="icon-btn" data-action="open-exo-stats-quick" data-exo-id="${exo.id}" title="Voir les courbes de cet exo">📈</button>
-            <button type="button" class="icon-btn" data-action="swap-live-exo" data-exo-idx="${exoIdx}" title="Remplacer l'exercice (machine prise)">🔄</button>
-            <button type="button" class="icon-btn" data-action="remove-live-exo" data-exo-idx="${exoIdx}" title="Retirer de la séance">✕</button>
+            <button type="button" class="circle-icon-btn" data-action="open-exo-stats-quick" data-exo-id="${exo.id}" title="Courbes">${ICONS.chart}</button>
+            <button type="button" class="circle-icon-btn" data-action="swap-live-exo" data-exo-idx="${exoIdx}" title="Remplacer">${ICONS.swap}</button>
+            <button type="button" class="circle-icon-btn" data-action="remove-live-exo" data-exo-idx="${exoIdx}" title="Retirer">${ICONS.close}</button>
           </div>
         </div>
 
-        <div class="exo-note-box">
-          <span>📌</span>
-          <input type="text" class="exo-note-input" placeholder="Note réglage (ex: Siège 4, poulie cran 2...)" value="${escapeAttr(exo.note || '')}" data-input="exo-note" data-exo-id="${exo.id}" />
+        <div class="exo-note-pill">
+          ${ICONS.pin}
+          <input type="text" class="exo-note-input" placeholder="Ajouter une note de réglage (siège, poulie...)" value="${escapeAttr(exo.note || '')}" data-input="exo-note" data-exo-id="${exo.id}" />
         </div>
 
-        ${headerRow}
         <div class="sets-list">
           ${setsHtml}
         </div>
 
         <div class="exo-footer-actions">
-          <button type="button" class="btn btn-secondary btn-sm" data-action="add-live-set" data-exo-idx="${exoIdx}">+ Série</button>
-          ${wExo.sets.length > 1 ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--text-muted);" data-action="remove-live-set" data-exo-idx="${exoIdx}">- Retirer dernière</button>` : ''}
+          <button type="button" class="btn btn-secondary btn-sm" data-action="add-live-set" data-exo-idx="${exoIdx}">+ Ajouter une série</button>
+          ${wExo.sets.length > 1 ? `<button type="button" class="btn btn-sm" style="color:var(--text-tertiary);" data-action="remove-live-set" data-exo-idx="${exoIdx}">Retirer</button>` : ''}
         </div>
       </div>
     `;
@@ -892,28 +883,25 @@ function renderActiveWorkout(container) {
     <div class="live-workout-banner">
       <div class="live-workout-meta">
         <h2>${escapeHtml(wk.name)}</h2>
-        <div class="live-workout-stats">
-          <span>✅ ${completedSets} / ${totalSets} séries</span>
-          <span>• Tap sur <strong>Série</strong> = W (Échauff.) / D (Drop) / F (Échec)</span>
-        </div>
+        <div class="live-workout-stats">${completedSets} sur ${totalSets} séries validées</div>
       </div>
-      <button type="button" class="btn btn-success btn-sm" data-action="finish-workout">Terminer ✓</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="finish-workout">Terminer</button>
     </div>
 
     ${blocksHtml}
 
-    <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
-      <button type="button" class="btn btn-secondary btn-block" data-action="add-exo-to-live">+ Ajouter un exercice à la séance</button>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <button type="button" class="btn btn-danger btn-block" data-action="cancel-workout">Annuler la séance</button>
-        <button type="button" class="btn btn-success btn-block" data-action="finish-workout">Terminer & Sauvegarder</button>
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <button type="button" class="btn btn-secondary btn-block" data-action="add-exo-to-live">+ Ajouter un exercice</button>
+      <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:10px;">
+        <button type="button" class="btn btn-danger btn-block" data-action="cancel-workout">Abandonner</button>
+        <button type="button" class="btn btn-primary btn-block" data-action="finish-workout">Valider la séance</button>
       </div>
     </div>
   `;
 }
 
 /* ==========================================================================
-   Templates & Exercises Management (Tab 2)
+   Tab 2: Templates & Exercise Library
    ========================================================================== */
 
 function renderTemplatesTab() {
@@ -924,59 +912,56 @@ function renderTemplatesTab() {
       const exo = getExercise(item.exerciseId);
       if (!exo) return '';
       return `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:0.84rem;">
-          <div>
-            <strong>${idx + 1}. ${escapeHtml(exo.name)}</strong>
-            <span class="badge ${exo.unilateral ? 'badge-unilateral' : 'badge-bilateral'}" style="margin-left:6px;">
-              ${exo.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}
-            </span>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:0.86rem;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="color:var(--volt); font-weight:800; font-size:0.76rem;">0${idx + 1}</span>
+            <strong style="font-weight:700;">${escapeHtml(exo.name)}</strong>
+            ${exo.unilateral ? `<span class="badge badge-unilateral">G/D</span>` : ''}
           </div>
-          <span style="color:var(--text-secondary); font-weight:600;">${item.setsCount} × ${escapeHtml(item.targetReps)}</span>
+          <span style="color:var(--text-secondary); font-weight:700;">${item.setsCount} × ${escapeHtml(item.targetReps)}</span>
         </div>
       `;
     }).join('');
 
     return `
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h3 style="font-size:1.05rem; font-weight:700;">${escapeHtml(tpl.name)}</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="font-size:1.12rem; font-weight:800; letter-spacing:-0.02em;">${escapeHtml(tpl.name)}</h3>
           <div style="display:flex; gap:6px;">
-            <button type="button" class="btn btn-secondary btn-sm" data-action="edit-template" data-id="${tpl.id}">✏️ Modifier</button>
-            <button type="button" class="icon-btn" data-action="delete-template" data-id="${tpl.id}" title="Supprimer">🗑️</button>
+            <button type="button" class="circle-icon-btn" data-action="edit-template" data-id="${tpl.id}">${ICONS.edit}</button>
+            <button type="button" class="circle-icon-btn" data-action="delete-template" data-id="${tpl.id}">${ICONS.trash}</button>
           </div>
         </div>
-        <div>${exoLines || '<span style="color:var(--text-muted); font-size:0.82rem;">Aucun exercice</span>'}</div>
+        <div>${exoLines || '<span style="color:var(--text-tertiary); font-size:0.82rem;">Aucun exercice</span>'}</div>
       </div>
     `;
   }).join('');
 
   const exercisesHtml = state.exercises.map((exo) => `
-    <div class="card" style="padding:12px 14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <div class="card" style="padding:15px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
       <div>
-        <div style="font-weight:700; font-size:0.95rem; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <div style="font-weight:800; font-size:0.96rem; display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
           <span>${escapeHtml(exo.name)}</span>
           <span class="badge badge-muscle">${escapeHtml(exo.muscle)}</span>
           <span class="badge ${exo.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">
-            ${exo.unilateral ? '🦿 Unilatéral (G/D)' : '🏋️ Bilatéral'}
+            ${exo.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}
           </span>
         </div>
-        ${exo.note ? `<div style="font-size:0.76rem; color:#fde68a; margin-top:4px;">📌 ${escapeHtml(exo.note)}</div>` : ''}
+        ${exo.note ? `<div style="font-size:0.78rem; color:var(--text-secondary); margin-top:5px;">${escapeHtml(exo.note)}</div>` : ''}
       </div>
-      <div style="display:flex; gap:6px;">
-        <button type="button" class="icon-btn" data-action="edit-exercise" data-id="${exo.id}">✏️</button>
-      </div>
+      <button type="button" class="circle-icon-btn" data-action="edit-exercise" data-id="${exo.id}">${ICONS.edit}</button>
     </div>
   `).join('');
 
   container.innerHTML = `
     <div class="section-header">
-      <span class="section-title">Mes Séances Types (Programmes)</span>
-      <button type="button" class="btn btn-primary btn-sm" data-action="create-template">+ Nouvelle séance</button>
+      <span class="section-title">Mes Séances Types</span>
+      <button type="button" class="btn btn-primary btn-sm" data-action="create-template">+ Créer</button>
     </div>
     ${tplListHtml}
 
-    <div class="section-header" style="margin-top:26px;">
-      <span class="section-title">Bibliothèque d'exercices (${state.exercises.length})</span>
+    <div class="section-header" style="margin-top:28px;">
+      <span class="section-title">Exercices (${state.exercises.length})</span>
       <button type="button" class="btn btn-secondary btn-sm" data-action="create-exercise">+ Nouvel exo</button>
     </div>
     ${exercisesHtml}
@@ -984,7 +969,7 @@ function renderTemplatesTab() {
 }
 
 /* ==========================================================================
-   Statistics & Progression Charts (Tab 3)
+   Tab 3: Smooth Progression Curves & KPI Bento
    ========================================================================== */
 
 function getExerciseStatsHistory(exerciseId) {
@@ -1015,7 +1000,7 @@ function getExerciseStatsHistory(exerciseId) {
         totalVolume += w * (rL + rR);
         if (w >= maxWeight) {
           maxWeight = w;
-          bestSetDesc = `${w}kg × G:${rL}/D:${rR}`;
+          bestSetDesc = `${w}kg (G:${rL}/D:${rR})`;
         }
         const e1rm = w * (1 + maxR / 30);
         if (e1rm > best1RM) best1RM = e1rm;
@@ -1058,7 +1043,7 @@ function renderStatsTab() {
 
   const optionsHtml = state.exercises.map((e) => `
     <option value="${e.id}" ${e.id === currentExo.id ? 'selected' : ''}>
-      ${escapeHtml(e.name)} ${e.unilateral ? '(Unilatéral G/D)' : '(Bilatéral)'}
+      ${escapeHtml(e.name)} ${e.unilateral ? '• Unilatéral' : ''}
     </option>
   `).join('');
 
@@ -1082,25 +1067,24 @@ function renderStatsTab() {
   const sessionRowsHtml = [...sessions].reverse().map((s) => {
     const setsPills = s.sets.map((st) => {
       if (s.unilateral) {
-        return `<span class="template-exo-pill">${st.weight}kg • G:${st.repsLeft} / D:${st.repsRight} ${st.rir ? `(@${st.rir})` : ''}</span>`;
+        return `<span class="soft-pill"><strong>${st.weight}kg</strong> G:${st.repsLeft} • D:${st.repsRight}</span>`;
       }
-      return `<span class="template-exo-pill">${st.weight}kg × ${st.reps} ${st.rir ? `(@${st.rir})` : ''}</span>`;
+      return `<span class="soft-pill"><strong>${st.weight}kg</strong> × ${st.reps}</span>`;
     }).join('');
 
     return `
-      <div class="card" style="padding:12px 14px; margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-weight:700; font-size:0.9rem;">📅 ${formatDateShort(s.date)}</span>
-          <span style="font-size:0.8rem; color:var(--primary); font-weight:700;">Max : ${s.bestSetDesc} (1RM ~${s.best1RM}kg)</span>
+      <div class="card" style="padding:16px 18px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span style="font-weight:800; font-size:0.92rem;">${formatDateShort(s.date)}</span>
+          <span style="font-size:0.8rem; color:var(--volt); font-weight:700;">${s.bestSetDesc} • 1RM ${s.best1RM}kg</span>
         </div>
-        <div class="template-exo-preview">${setsPills}</div>
+        <div class="pill-cloud">${setsPills}</div>
       </div>
     `;
   }).join('');
 
   container.innerHTML = `
     <div class="form-group">
-      <label class="form-label">Sélectionner un exercice à analyser</label>
       <select id="stats-exo-select" class="form-select">
         ${optionsHtml}
       </select>
@@ -1108,45 +1092,45 @@ function renderStatsTab() {
 
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">🏆 Record Poids</div>
-        <div class="kpi-value">${allTimeMaxWeight} <span style="font-size:0.85rem; font-weight:500;">kg</span></div>
-        <div class="kpi-sub">${currentExo.unilateral ? 'Poids par bras/jambe' : 'Charge totale'}</div>
+        <div class="kpi-label">RECORD CHARGE</div>
+        <div class="kpi-value" style="color:var(--volt);">${allTimeMaxWeight} <span style="font-size:0.85rem;">kg</span></div>
+        <div class="kpi-sub">${currentExo.unilateral ? 'Par côté' : 'Barre / Paire'}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">⚡ 1RM Estimé</div>
-        <div class="kpi-value">${allTimeBest1RM} <span style="font-size:0.85rem; font-weight:500;">kg</span></div>
-        <div class="kpi-sub">Formule d'Epley</div>
+        <div class="kpi-label">1RM ESTIMÉ</div>
+        <div class="kpi-value">${allTimeBest1RM} <span style="font-size:0.85rem;">kg</span></div>
+        <div class="kpi-sub">Potentiel max</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">📊 Volume Record</div>
-        <div class="kpi-value">${allTimeMaxVol} <span style="font-size:0.85rem; font-weight:500;">kg</span></div>
+        <div class="kpi-label">VOLUME MAX</div>
+        <div class="kpi-value">${allTimeMaxVol} <span style="font-size:0.85rem;">kg</span></div>
         <div class="kpi-sub">Sur une séance</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">${currentExo.unilateral ? '⚖️ Équilibre G / D' : '🔥 Séances tracées'}</div>
-        <div class="kpi-value" style="font-size:1.1rem;">
-          ${currentExo.unilateral && totalUniReps > 0 ? `G:${leftPct}% / D:${rightPct}%` : `${sessions.length} séances`}
+        <div class="kpi-label">${currentExo.unilateral ? 'SYMÉTRIE G / D' : 'SÉANCES'}</div>
+        <div class="kpi-value" style="font-size:1.25rem;">
+          ${currentExo.unilateral && totalUniReps > 0 ? `${leftPct}% / ${rightPct}%` : `${sessions.length}`}
         </div>
-        <div class="kpi-sub">${currentExo.unilateral ? `Total: ${sumLeft} reps G vs ${sumRight} D` : 'Historique complet'}</div>
+        <div class="kpi-sub">${currentExo.unilateral ? `${sumLeft} G vs ${sumRight} D` : 'Complétées'}</div>
       </div>
     </div>
 
     <div class="card">
       <div class="chart-tabs">
-        <button type="button" class="chart-tab ${metric === 'maxWeight' ? 'active' : ''}" data-action="set-stat-metric" data-metric="maxWeight">Poids Max (kg)</button>
-        <button type="button" class="chart-tab ${metric === 'e1rm' ? 'active' : ''}" data-action="set-stat-metric" data-metric="e1rm">1RM Estimé (kg)</button>
-        <button type="button" class="chart-tab ${metric === 'volume' ? 'active' : ''}" data-action="set-stat-metric" data-metric="volume">Volume (kg)</button>
+        <button type="button" class="chart-tab ${metric === 'maxWeight' ? 'active' : ''}" data-action="set-stat-metric" data-metric="maxWeight">Charge Max</button>
+        <button type="button" class="chart-tab ${metric === 'e1rm' ? 'active' : ''}" data-action="set-stat-metric" data-metric="e1rm">1RM Estimé</button>
+        <button type="button" class="chart-tab ${metric === 'volume' ? 'active' : ''}" data-action="set-stat-metric" data-metric="volume">Volume</button>
         ${currentExo.unilateral ? `<button type="button" class="chart-tab ${metric === 'asymmetry' ? 'active' : ''}" data-action="set-stat-metric" data-metric="asymmetry">Gauche vs Droite</button>` : ''}
       </div>
-      <div class="chart-box" id="svg-chart-container">
-        ${buildSvgChart(sessions, metric)}
+      <div class="chart-box">
+        ${buildSmoothSvgChart(sessions, metric)}
       </div>
     </div>
 
     <div class="section-header">
-      <span class="section-title">Historique séance par séance (${sessions.length})</span>
+      <span class="section-title">Historique (${sessions.length})</span>
     </div>
-    ${sessions.length ? sessionRowsHtml : '<div class="card" style="color:var(--text-secondary);">Valide au moins une séance avec cet exercice pour voir son historique détaillé.</div>'}
+    ${sessions.length ? sessionRowsHtml : '<div class="card" style="color:var(--text-secondary);">Valide une séance avec cet exercice pour débloquer sa courbe.</div>'}
   `;
 
   const sel = document.getElementById('stats-exo-select');
@@ -1158,22 +1142,34 @@ function renderStatsTab() {
   }
 }
 
-function buildSvgChart(sessions, metric) {
+function buildSmoothCurvePath(pts) {
+  if (pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i];
+    const p1 = pts[i + 1];
+    const midX = (p0.x + p1.x) / 2;
+    d += ` C ${midX} ${p0.y}, ${midX} ${p1.y}, ${p1.x} ${p1.y}`;
+  }
+  return d;
+}
+
+function buildSmoothSvgChart(sessions, metric) {
   if (!sessions || sessions.length === 0) {
-    return `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:0.86rem;">Pas encore de données pour afficher le graphique.</div>`;
+    return `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-tertiary); font-size:0.86rem;">Pas encore de données.</div>`;
   }
 
-  const w = 520;
+  const w = 500;
   const h = 195;
-  const padL = 40;
-  const padR = 20;
-  const padT = 22;
+  const padL = 34;
+  const padR = 24;
+  const padT = 26;
   const padB = 30;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
   if (metric === 'asymmetry') {
-    // Dual line chart: Left Reps (Blue) vs Right Reps (Purple)
     const valsL = sessions.map((s) => s.totalRepsLeft);
     const valsR = sessions.map((s) => s.totalRepsRight);
     const allVals = [...valsL, ...valsR];
@@ -1183,25 +1179,25 @@ function buildSvgChart(sessions, metric) {
     const getX = (i) => sessions.length === 1 ? padL + plotW / 2 : padL + (i / (sessions.length - 1)) * plotW;
     const getY = (v) => padT + plotH - ((v - minV) / (maxV - minV || 1)) * plotH;
 
-    const pointsL = sessions.map((s, i) => `${getX(i)},${getY(s.totalRepsLeft)}`).join(' ');
-    const pointsR = sessions.map((s, i) => `${getX(i)},${getY(s.totalRepsRight)}`).join(' ');
+    const ptsL = sessions.map((s, i) => ({ x: getX(i), y: getY(s.totalRepsLeft) }));
+    const ptsR = sessions.map((s, i) => ({ x: getX(i), y: getY(s.totalRepsRight) }));
 
-    const dotsL = sessions.map((s, i) => `<circle cx="${getX(i)}" cy="${getY(s.totalRepsLeft)}" r="4.5" fill="#3b82f6"/>`).join('');
-    const dotsR = sessions.map((s, i) => `<circle cx="${getX(i)}" cy="${getY(s.totalRepsRight)}" r="4.5" fill="#a855f7"/>`).join('');
-    const labelsX = sessions.map((s, i) => `<text x="${getX(i)}" y="${h - 8}" fill="#64748b" font-size="10" text-anchor="middle">${formatDateShort(s.date)}</text>`).join('');
+    const pathL = buildSmoothCurvePath(ptsL);
+    const pathR = buildSmoothCurvePath(ptsR);
+
+    const dotsL = ptsL.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#38bdf8" stroke="#111113" stroke-width="2"/>`).join('');
+    const dotsR = ptsR.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#c084fc" stroke="#111113" stroke-width="2"/>`).join('');
+    const labelsX = sessions.map((s, i) => `<text x="${getX(i)}" y="${h - 6}" fill="#63636e" font-size="11" font-weight="600" text-anchor="middle">${formatDateShort(s.date)}</text>`).join('');
 
     return `
       <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%">
-        <line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="rgba(255,255,255,0.06)" />
-        <line x1="${padL}" y1="${padT + plotH / 2}" x2="${w - padR}" y2="${padT + plotH / 2}" stroke="rgba(255,255,255,0.06)" />
-        <line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.12)" />
-        <polyline fill="none" stroke="#3b82f6" stroke-width="3" points="${pointsL}" />
-        <polyline fill="none" stroke="#a855f7" stroke-width="3" stroke-dasharray="5,4" points="${pointsR}" />
+        <path d="${pathL}" fill="none" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round" />
+        <path d="${pathR}" fill="none" stroke="#c084fc" stroke-width="3.5" stroke-dasharray="6,5" stroke-linecap="round" />
         ${dotsL}
         ${dotsR}
         ${labelsX}
-        <text x="${padL + 6}" y="${padT + 12}" fill="#60a5fa" font-size="11" font-weight="bold">● Reps Gauche</text>
-        <text x="${padL + 110}" y="${padT + 12}" fill="#c084fc" font-size="11" font-weight="bold">● Reps Droite</text>
+        <text x="${padL}" y="14" fill="#38bdf8" font-size="11" font-weight="800">● GAUCHE</text>
+        <text x="${padL + 82}" y="14" fill="#c084fc" font-size="11" font-weight="800">● DROITE</text>
       </svg>
     `;
   }
@@ -1214,42 +1210,42 @@ function buildSvgChart(sessions, metric) {
 
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
-  const padRange = (maxVal - minVal) === 0 ? Math.max(5, maxVal * 0.1) : (maxVal - minVal) * 0.2;
+  const padRange = (maxVal - minVal) === 0 ? Math.max(5, maxVal * 0.1) : (maxVal - minVal) * 0.22;
   const low = Math.max(0, minVal - padRange);
   const high = maxVal + padRange;
 
   const getX = (i) => sessions.length === 1 ? padL + plotW / 2 : padL + (i / (sessions.length - 1)) * plotW;
   const getY = (v) => padT + plotH - ((v - low) / (high - low || 1)) * plotH;
 
-  const pts = values.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
-  const areaPts = `${getX(0)},${padT + plotH} ${pts} ${getX(values.length - 1)},${padT + plotH}`;
+  const pts = values.map((v, i) => ({ x: getX(i), y: getY(v), v }));
+  const curvePath = buildSmoothCurvePath(pts);
+  const areaPath = pts.length > 1
+    ? `${curvePath} L ${pts[pts.length - 1].x} ${padT + plotH} L ${pts[0].x} ${padT + plotH} Z`
+    : '';
 
-  const circles = values.map((v, i) => `
-    <circle cx="${getX(i)}" cy="${getY(v)}" r="5" fill="#3b82f6" stroke="#09090b" stroke-width="2" />
-    <text x="${getX(i)}" y="${getY(v) - 9}" fill="#e2e8f0" font-size="11" font-weight="700" text-anchor="middle">${v}</text>
-    <text x="${getX(i)}" y="${h - 8}" fill="#64748b" font-size="10" text-anchor="middle">${formatDateShort(sessions[i].date)}</text>
+  const nodes = pts.map((p, i) => `
+    <circle cx="${p.x}" cy="${p.y}" r="5.5" fill="#d0fd3e" stroke="#111113" stroke-width="2.5" />
+    <text x="${p.x}" y="${p.y - 11}" fill="#ffffff" font-size="11" font-weight="800" text-anchor="middle">${p.v}</text>
+    <text x="${p.x}" y="${h - 6}" fill="#63636e" font-size="11" font-weight="600" text-anchor="middle">${formatDateShort(sessions[i].date)}</text>
   `).join('');
 
   return `
     <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%">
       <defs>
-        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.38"/>
-          <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+        <linearGradient id="voltGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#d0fd3e" stop-opacity="0.32"/>
+          <stop offset="100%" stop-color="#d0fd3e" stop-opacity="0.0"/>
         </linearGradient>
       </defs>
-      <line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="rgba(255,255,255,0.06)" />
-      <line x1="${padL}" y1="${padT + plotH / 2}" x2="${w - padR}" y2="${padT + plotH / 2}" stroke="rgba(255,255,255,0.06)" />
-      <line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.14)" />
-      ${values.length > 1 ? `<polygon points="${areaPts}" fill="url(#chartGrad)" />` : ''}
-      ${values.length > 1 ? `<polyline fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${pts}" />` : ''}
-      ${circles}
+      ${pts.length > 1 ? `<path d="${areaPath}" fill="url(#voltGrad)" />` : ''}
+      ${pts.length > 1 ? `<path d="${curvePath}" fill="none" stroke="#d0fd3e" stroke-width="3.5" stroke-linecap="round" />` : ''}
+      ${nodes}
     </svg>
   `;
 }
 
 /* ==========================================================================
-   Settings, Apple Watch & Cloud Sync (Tab 4)
+   Tab 4: Apple Watch & Cloud Sync
    ========================================================================== */
 
 function renderSettingsTab() {
@@ -1258,76 +1254,58 @@ function renderSettingsTab() {
 
   container.innerHTML = `
     <div class="section-header">
-      <span class="section-title">⌚ Vibration Apple Watch & Chrono</span>
+      <span class="section-title">Apple Watch & Chrono</span>
     </div>
     <div class="card">
-      <p style="font-size:0.83rem; color:var(--text-secondary); line-height:1.45; margin-bottom:12px;">
-        Pour faire vibrer ton <strong>Apple Watch</strong> à la fin de ton temps de repos, tu as <strong>2 méthodes complémentaires</strong> :
-      </p>
-
       <div class="toggle-row" style="margin-bottom:10px;">
         <div>
-          <div style="font-weight:700; font-size:0.9rem;">1. Notifications Web iOS (Écran verrouillé)</div>
-          <div style="font-size:0.75rem; color:var(--text-secondary);">Fait vibrer l'Apple Watch quand l'app est sur l'écran d'accueil et l'iPhone verrouillé.</div>
+          <div style="font-weight:800; font-size:0.92rem;">Notifications iOS / Watch</div>
+          <div style="font-size:0.76rem; color:var(--text-secondary); margin-top:2px;">Vibre sur la montre quand l'iPhone est verrouillé</div>
         </div>
         <button type="button" class="btn btn-secondary btn-sm" data-action="request-notif-perm">
-          ${notifStatus === 'granted' ? '✅ Activé' : 'Activer'}
+          ${notifStatus === 'granted' ? 'Activé' : 'Activer'}
         </button>
       </div>
 
-      <div class="toggle-row" style="margin-bottom:10px;">
+      <div class="toggle-row" style="margin-bottom:12px;">
         <div>
-          <div style="font-weight:700; font-size:0.9rem;">2. Relais Minuteur Natif Apple Watch</div>
-          <div style="font-size:0.75rem; color:var(--text-secondary);">Lance automatiquement le vrai minuteur iOS/Watch à chaque série validée (vibre même iPhone déverrouillé !).</div>
+          <div style="font-weight:800; font-size:0.92rem;">Relais Minuteur Natif Watch</div>
+          <div style="font-size:0.76rem; color:var(--text-secondary); margin-top:2px;">Lance le minuteur Apple Watch à chaque série validée</div>
         </div>
-        <input type="checkbox" id="toggle-watch-shortcut" ${state.settings.watchShortcutAuto ? 'checked' : ''} style="width:22px; height:22px;" />
+        <input type="checkbox" id="toggle-watch-shortcut" ${state.settings.watchShortcutAuto ? 'checked' : ''} style="width:22px; height:22px; accent-color:var(--volt);" />
       </div>
 
-      <button type="button" class="btn btn-ghost btn-sm" data-action="open-watch-guide" style="padding-left:0;">
-        📖 Comment créer le Raccourci iOS "IronPulse Timer" en 20 secondes →
+      <button type="button" class="btn btn-ghost btn-block" data-action="open-watch-guide">
+        Configurer le Raccourci iOS en 20s →
       </button>
     </div>
 
     <div class="section-header">
-      <span class="section-title">☁️ Sauvegarde Permanente & Cloud Gratuit</span>
+      <span class="section-title">Synchronisation Cloud Gratuite</span>
     </div>
     <div class="card">
-      <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.45; margin-bottom:12px;">
-        Tes données sont sauvegardées en permanence dans la mémoire interne de ton iPhone (<strong>LocalStorage + IndexedDB</strong>).
-        Tu peux aussi activer une synchronisation Cloud gratuite (Firebase Realtime DB) pour synchroniser plusieurs appareils automatiquement à chaque fin de séance.
-      </p>
       <div class="form-group">
-        <label class="form-label">URL Firebase Realtime Database (Gratuit) ou Webhook JSON</label>
+        <label class="form-label">URL Firebase Realtime DB (optionnel)</label>
         <input type="text" id="cloud-url-input" class="form-input" placeholder="https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app" value="${escapeAttr(state.settings.cloudUrl || '')}" />
       </div>
-      ${state.settings.lastCloudSync ? `<div style="font-size:0.76rem; color:var(--success); margin-bottom:10px;">✅ Dernière synchro Cloud : ${new Date(state.settings.lastCloudSync).toLocaleString('fr-FR')}</div>` : ''}
+      ${state.settings.lastCloudSync ? `<div style="font-size:0.76rem; color:var(--volt); margin-bottom:12px; font-weight:700;">Dernière synchro : ${new Date(state.settings.lastCloudSync).toLocaleString('fr-FR')}</div>` : ''}
       <div class="form-row">
-        <button type="button" class="btn btn-primary btn-sm" data-action="cloud-push">☁️ Envoyer vers Cloud</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="cloud-pull">📥 Restaurer du Cloud</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="cloud-push">Sauvegarder</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="cloud-pull">Restaurer</button>
       </div>
     </div>
 
     <div class="section-header">
-      <span class="section-title">💾 Export / Import Fichier (iCloud Drive)</span>
+      <span class="section-title">Fichier de secours (iCloud Drive)</span>
     </div>
     <div class="card">
       <div class="form-row">
-        <button type="button" class="btn btn-secondary btn-sm" data-action="export-json">📤 Exporter (.json)</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="export-json">Exporter .json</button>
         <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-          📂 Importer (.json)
+          Importer .json
           <input type="file" id="import-json-input" accept=".json,application/json" style="display:none;" />
         </label>
       </div>
-    </div>
-
-    <div class="section-header">
-      <span class="section-title">📲 Installer sur ton iPhone (100% Gratuit)</span>
-    </div>
-    <div class="card" style="font-size:0.83rem; color:var(--text-secondary); line-height:1.5;">
-      1. Ouvre ce lien dans <strong>Safari</strong> sur ton iPhone.<br/>
-      2. Appuie sur le bouton <strong>Partager</strong> (carré avec flèche vers le haut en bas).<br/>
-      3. Choisis <strong>"Sur l'écran d'accueil"</strong>.<br/>
-      L'application sera installée en plein écran, fonctionnera même sans réseau au sous-sol de la salle, et n'expirera jamais !
     </div>
   `;
 
@@ -1336,7 +1314,7 @@ function renderSettingsTab() {
     watchToggle.addEventListener('change', (e) => {
       state.settings.watchShortcutAuto = e.target.checked;
       saveState();
-      showToast(e.target.checked ? '⌚ Relais Apple Watch activé' : 'Relais Apple Watch désactivé');
+      showToast(e.target.checked ? 'Relais Apple Watch activé' : 'Relais désactivé');
     });
   }
 
@@ -1355,7 +1333,7 @@ function renderSettingsTab() {
 }
 
 /* ==========================================================================
-   Modals (Create/Edit Template, Create/Edit Exercise, Swap Exo, Watch Guide)
+   Modals
    ========================================================================== */
 
 function openModal(title, bodyHtml) {
@@ -1370,9 +1348,7 @@ function closeModal() {
 
 function openExerciseModal(exoId = null, onCreatedCallback = null) {
   const existing = exoId ? getExercise(exoId) : null;
-  const title = existing ? 'Modifier l’exercice' : 'Nouvel exercice';
-
-  openModal(title, `
+  openModal(existing ? 'Modifier l’exercice' : 'Nouvel exercice', `
     <form id="exo-form">
       <div class="form-group">
         <label class="form-label">Nom de l'exercice</label>
@@ -1380,30 +1356,30 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Groupe musculaire</label>
+          <label class="form-label">Muscle</label>
           <select name="muscle" class="form-select">
             ${['Pectoraux', 'Dos', 'Épaules', 'Biceps', 'Triceps', 'Quadriceps', 'Ischios', 'Fessiers / Quadris', 'Mollets', 'Abdos'].map((m) => `<option value="${m}" ${existing && existing.muscle === m ? 'selected' : ''}>${m}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Repos par défaut (sec)</label>
+          <label class="form-label">Repos (sec)</label>
           <input type="number" name="defaultRest" class="form-input" value="${existing ? existing.defaultRest : 90}" />
         </div>
       </div>
       <div class="form-group">
         <div class="toggle-row">
           <div>
-            <div style="font-weight:700; font-size:0.9rem;">🦿 Exercice Unilatéral (Gauche / Droite séparés)</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">Active deux colonnes Reps Gauche et Reps Droite + suivi des déséquilibres.</div>
+            <div style="font-weight:800; font-size:0.9rem;">Unilatéral (Gauche / Droite séparés)</div>
+            <div style="font-size:0.74rem; color:var(--text-secondary);">Active les colonnes G et D pour chaque série</div>
           </div>
-          <input type="checkbox" name="unilateral" ${existing && existing.unilateral ? 'checked' : ''} style="width:22px; height:22px;" />
+          <input type="checkbox" name="unilateral" ${existing && existing.unilateral ? 'checked' : ''} style="width:22px; height:22px; accent-color:var(--volt);" />
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">📌 Note épinglée (réglage siège, poulie...)</label>
+        <label class="form-label">Note de réglage</label>
         <input type="text" name="note" class="form-input" placeholder="Ex: Siège cran 4, poulie basse" value="${escapeAttr(existing ? existing.note || '' : '')}" />
       </div>
-      <button type="submit" class="btn btn-primary btn-block">Enregistrer l'exercice</button>
+      <button type="submit" class="btn btn-primary btn-block">Enregistrer</button>
     </form>
   `);
 
@@ -1435,7 +1411,7 @@ function openExerciseModal(exoId = null, onCreatedCallback = null) {
     saveState();
     closeModal();
     renderAll();
-    showToast('✅ Exercice enregistré !');
+    showToast('Exercice enregistré');
   });
 }
 
@@ -1450,57 +1426,55 @@ function openTemplateModal(templateId = null) {
     const itemsHtml = draftItems.map((it, idx) => {
       const opts = state.exercises.map((ex) => `
         <option value="${ex.id}" ${ex.id === it.exerciseId ? 'selected' : ''}>
-          ${escapeHtml(ex.name)} ${ex.unilateral ? '(Unilatéral G/D)' : ''}
+          ${escapeHtml(ex.name)} ${ex.unilateral ? '(G/D)' : ''}
         </option>
       `).join('');
 
       return `
-        <div class="card" style="padding:10px; margin-bottom:10px; background:var(--bg-elevated);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">
-            <span style="font-weight:700; font-size:0.82rem; color:var(--primary);">Exo #${idx + 1}</span>
+        <div style="background:var(--surface-2); border-radius:22px; padding:14px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:800; font-size:0.75rem; color:var(--volt);">EXERCICE 0${idx + 1}</span>
             <div style="display:flex; gap:4px;">
-              ${idx > 0 ? `<button type="button" class="icon-btn tpl-move-up" data-idx="${idx}">↑</button>` : ''}
-              ${idx < draftItems.length - 1 ? `<button type="button" class="icon-btn tpl-move-down" data-idx="${idx}">↓</button>` : ''}
-              <button type="button" class="icon-btn tpl-remove-item" data-idx="${idx}">✕</button>
+              ${idx > 0 ? `<button type="button" class="circle-icon-btn tpl-move-up" data-idx="${idx}">↑</button>` : ''}
+              ${idx < draftItems.length - 1 ? `<button type="button" class="circle-icon-btn tpl-move-down" data-idx="${idx}">↓</button>` : ''}
+              <button type="button" class="circle-icon-btn tpl-remove-item" data-idx="${idx}">${ICONS.close}</button>
             </div>
           </div>
-          <div class="form-group" style="margin-bottom:8px;">
-            <select class="form-select tpl-exo-select" data-idx="${idx}">${opts}</select>
+          <div class="form-group" style="margin-bottom:10px;">
+            <select class="form-select tpl-exo-select" data-idx="${idx}" style="background:var(--surface-3);">${opts}</select>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
             <div>
-              <label class="form-label" style="font-size:0.7rem;">Séries</label>
-              <input type="number" class="form-input tpl-sets-input" data-idx="${idx}" value="${it.setsCount}" min="1" max="15" />
+              <label class="form-label" style="font-size:0.68rem;">Séries</label>
+              <input type="number" class="form-input tpl-sets-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.setsCount}" min="1" max="15" />
             </div>
             <div>
-              <label class="form-label" style="font-size:0.7rem;">Reps cible</label>
-              <input type="text" class="form-input tpl-reps-input" data-idx="${idx}" value="${escapeAttr(it.targetReps)}" placeholder="8-12" />
+              <label class="form-label" style="font-size:0.68rem;">Reps</label>
+              <input type="text" class="form-input tpl-reps-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${escapeAttr(it.targetReps)}" />
             </div>
             <div>
-              <label class="form-label" style="font-size:0.7rem;">Repos (s)</label>
-              <input type="number" class="form-input tpl-rest-input" data-idx="${idx}" value="${it.restSeconds || 90}" step="15" />
+              <label class="form-label" style="font-size:0.68rem;">Repos (s)</label>
+              <input type="number" class="form-input tpl-rest-input" style="background:var(--surface-3); padding:10px;" data-idx="${idx}" value="${it.restSeconds || 90}" step="15" />
             </div>
           </div>
         </div>
       `;
     }).join('');
 
-    openModal(existing ? 'Modifier la séance' : 'Créer une séance type', `
+    openModal(existing ? 'Modifier la séance' : 'Nouvelle séance', `
       <div class="form-group">
-        <label class="form-label">Nom de la séance (ex: Push, Upper A, Jambes...)</label>
-        <input type="text" id="tpl-name-input" class="form-input" placeholder="Ex: Séance Push A" value="${escapeAttr(draftName)}" />
+        <label class="form-label">Nom de la séance</label>
+        <input type="text" id="tpl-name-input" class="form-input" placeholder="Ex: Push A" value="${escapeAttr(draftName)}" />
       </div>
       <div id="tpl-items-wrap">${itemsHtml}</div>
-      <div style="display:flex; gap:8px; margin-bottom:14px;">
-        <button type="button" class="btn btn-secondary btn-sm" id="tpl-add-exo-btn" style="flex:1;">+ Ajouter un exo à la liste</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="tpl-create-new-exo-btn">+ Créer un nouvel exo</button>
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button type="button" class="btn btn-secondary btn-sm" id="tpl-add-exo-btn" style="flex:1;">+ Ajouter un exo</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="tpl-create-new-exo-btn">+ Créer un exo</button>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="tpl-save-btn">Enregistrer la séance</button>
     `);
 
-    document.getElementById('tpl-name-input').addEventListener('input', (e) => {
-      draftName = e.target.value;
-    });
+    document.getElementById('tpl-name-input').addEventListener('input', (e) => { draftName = e.target.value; });
 
     document.querySelectorAll('.tpl-exo-select').forEach((el) => {
       el.addEventListener('change', (e) => {
@@ -1513,27 +1487,20 @@ function openTemplateModal(templateId = null) {
     });
 
     document.querySelectorAll('.tpl-sets-input').forEach((el) => {
-      el.addEventListener('input', (e) => {
-        draftItems[parseInt(e.target.dataset.idx)].setsCount = parseInt(e.target.value) || 3;
-      });
+      el.addEventListener('input', (e) => { draftItems[parseInt(e.target.dataset.idx)].setsCount = parseInt(e.target.value) || 3; });
     });
 
     document.querySelectorAll('.tpl-reps-input').forEach((el) => {
-      el.addEventListener('input', (e) => {
-        draftItems[parseInt(e.target.dataset.idx)].targetReps = e.target.value;
-      });
+      el.addEventListener('input', (e) => { draftItems[parseInt(e.target.dataset.idx)].targetReps = e.target.value; });
     });
 
     document.querySelectorAll('.tpl-rest-input').forEach((el) => {
-      el.addEventListener('input', (e) => {
-        draftItems[parseInt(e.target.dataset.idx)].restSeconds = parseInt(e.target.value) || 90;
-      });
+      el.addEventListener('input', (e) => { draftItems[parseInt(e.target.dataset.idx)].restSeconds = parseInt(e.target.value) || 90; });
     });
 
     document.querySelectorAll('.tpl-remove-item').forEach((el) => {
       el.addEventListener('click', (e) => {
-        const i = parseInt(e.currentTarget.dataset.idx);
-        draftItems.splice(i, 1);
+        draftItems.splice(parseInt(e.currentTarget.dataset.idx), 1);
         renderModalContent();
       });
     });
@@ -1541,9 +1508,7 @@ function openTemplateModal(templateId = null) {
     document.querySelectorAll('.tpl-move-up').forEach((el) => {
       el.addEventListener('click', (e) => {
         const i = parseInt(e.currentTarget.dataset.idx);
-        const tmp = draftItems[i - 1];
-        draftItems[i - 1] = draftItems[i];
-        draftItems[i] = tmp;
+        [draftItems[i - 1], draftItems[i]] = [draftItems[i], draftItems[i - 1]];
         renderModalContent();
       });
     });
@@ -1551,9 +1516,7 @@ function openTemplateModal(templateId = null) {
     document.querySelectorAll('.tpl-move-down').forEach((el) => {
       el.addEventListener('click', (e) => {
         const i = parseInt(e.currentTarget.dataset.idx);
-        const tmp = draftItems[i + 1];
-        draftItems[i + 1] = draftItems[i];
-        draftItems[i] = tmp;
+        [draftItems[i + 1], draftItems[i]] = [draftItems[i], draftItems[i + 1]];
         renderModalContent();
       });
     });
@@ -1587,16 +1550,12 @@ function openTemplateModal(templateId = null) {
         existing.name = finalName;
         existing.items = draftItems;
       } else {
-        state.templates.push({
-          id: uid('tpl'),
-          name: finalName,
-          items: draftItems
-        });
+        state.templates.push({ id: uid('tpl'), name: finalName, items: draftItems });
       }
       saveState();
       closeModal();
       renderAll();
-      showToast('✅ Séance enregistrée !');
+      showToast('Séance enregistrée');
     });
   }
 
@@ -1604,44 +1563,36 @@ function openTemplateModal(templateId = null) {
 }
 
 function openWatchGuideModal() {
-  openModal('⌚ Faire vibrer ton Apple Watch', `
-    <div style="font-size:0.86rem; line-height:1.55; color:var(--text-main);">
-      <p style="margin-bottom:12px;">
-        Sur iOS, l'Apple Watch vibre automatiquement pour le <strong>Minuteur natif d'Apple</strong>. Tu peux relier IronPulse au minuteur natif en créant un raccourci d'une seule action :
+  openModal('Relais Apple Watch', `
+    <div style="font-size:0.88rem; line-height:1.55; color:var(--text-secondary);">
+      <p style="margin-bottom:14px;">
+        Pour déclencher le vrai minuteur natif de ton Apple Watch automatiquement depuis l'appli :
       </p>
-      <div class="card" style="background:var(--bg-elevated); padding:12px;">
-        <strong>Étape 1 :</strong> Ouvre l'application <strong>Raccourcis (Shortcuts)</strong> sur ton iPhone.<br/><br/>
-        <strong>Étape 2 :</strong> Appuie sur <strong>+</strong> en haut à droite et renomme le raccourci exactement :<br/>
-        <code style="color:#60a5fa; font-weight:700;">IronPulse Timer</code><br/><br/>
-        <strong>Étape 3 :</strong> Ajoute l'action <strong>"Démarrer le minuteur" (Start Timer)</strong>.<br/><br/>
-        <strong>Étape 4 :</strong> Appuie longtemps sur la durée, choisis <strong>"Entrée du raccourci" (Shortcut Input)</strong> et sélectionne <strong>Secondes</strong>.
+      <div style="background:var(--surface-2); border-radius:22px; padding:16px; color:#fff;">
+        <strong>1.</strong> Ouvre l'app <strong>Raccourcis</strong> sur ton iPhone.<br/><br/>
+        <strong>2.</strong> Crée un raccourci nommé exactement :<br/>
+        <span style="color:var(--volt); font-weight:800;">IronPulse Timer</span><br/><br/>
+        <strong>3.</strong> Ajoute l'action <strong>Démarrer le minuteur</strong>.<br/><br/>
+        <strong>4.</strong> Maintiens le doigt sur la durée → choisis <strong>Entrée du raccourci</strong> en <strong>Secondes</strong>.
       </div>
-      <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:10px;">
-        Ensuite, utilise le bouton <strong>⌚</strong> sur la barre du chrono ou active l'option automatique : dès que tu coches une série, ton Apple Watch lance le compte à rebours et te fait vibrer le poignet à 00:00 !
-      </p>
     </div>
   `);
 }
 
 /* ==========================================================================
-   Event Delegation & Interactions
+   Events
    ========================================================================== */
 
 function setupEvents() {
-  // Bottom Navigation
-  document.querySelectorAll('.nav-item').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      switchTab(btn.dataset.tab);
-    });
+  document.querySelectorAll('.dock-item').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // Modal Close
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
     if (e.target.id === 'modal-overlay') closeModal();
   });
 
-  // Rest Timer Controls
   document.getElementById('timer-minus-15').addEventListener('click', () => adjustRestTimer(-15));
   document.getElementById('timer-plus-15').addEventListener('click', () => adjustRestTimer(15));
   document.getElementById('timer-skip').addEventListener('click', stopRestTimer);
@@ -1650,7 +1601,6 @@ function setupEvents() {
     triggerWatchShortcut(rem);
   });
 
-  // Main Content Click Delegation
   const main = document.getElementById('main-content');
 
   main.addEventListener('click', (e) => {
@@ -1685,8 +1635,7 @@ function setupEvents() {
       const setIdx = parseInt(btn.dataset.setIdx);
       const s = state.activeWorkout.exercises[exoIdx].sets[setIdx];
       const rirs = ['', '0', '1', '2', '3+'];
-      const next = rirs[(rirs.indexOf(s.rir || '') + 1) % rirs.length];
-      s.rir = next;
+      s.rir = rirs[(rirs.indexOf(s.rir || '') + 1) % rirs.length];
       saveState();
       renderWorkoutTab();
     } else if (action === 'copy-prev-set') {
@@ -1708,7 +1657,7 @@ function setupEvents() {
         }
         saveState();
         renderWorkoutTab();
-        showToast('📋 Charges de la dernière séance copiées !');
+        showToast('Charges copiées');
       }
     } else if (action === 'toggle-set-done') {
       const exoIdx = parseInt(btn.dataset.exoIdx);
@@ -1720,9 +1669,7 @@ function setupEvents() {
       if (s.done) {
         const pr = checkSetPR(wExo.exerciseId, s, wExo.unilateral);
         s.prBadge = pr;
-        if (pr) {
-          showToast(`🏆 Nouveau Record Personnel (${pr}) !`, true);
-        }
+        if (pr) showToast(`Nouveau Record (${pr}) !`, true);
         if (state.settings.autoStartTimer) {
           const exoObj = getExercise(wExo.exerciseId);
           startRestTimer(wExo.restSeconds || 90, exoObj ? exoObj.name : 'Exercice');
@@ -1760,20 +1707,18 @@ function setupEvents() {
     } else if (action === 'edit-live-rest') {
       const exoIdx = parseInt(btn.dataset.exoIdx);
       const wExo = state.activeWorkout.exercises[exoIdx];
-      const val = prompt('Temps de repos pour cet exercice (en secondes) :', wExo.restSeconds || 90);
+      const val = prompt('Temps de repos (secondes) :', wExo.restSeconds || 90);
       if (val !== null) {
         wExo.restSeconds = Math.max(15, parseInt(val) || 90);
         saveState();
         renderWorkoutTab();
       }
     } else if (action === 'swap-live-exo') {
-      const exoIdx = parseInt(btn.dataset.exoIdx);
-      openSwapOrAddExoModal(exoIdx);
+      openSwapOrAddExoModal(parseInt(btn.dataset.exoIdx));
     } else if (action === 'add-exo-to-live') {
       openSwapOrAddExoModal(null);
     } else if (action === 'remove-live-exo') {
-      const exoIdx = parseInt(btn.dataset.exoIdx);
-      state.activeWorkout.exercises.splice(exoIdx, 1);
+      state.activeWorkout.exercises.splice(parseInt(btn.dataset.exoIdx), 1);
       saveState();
       renderWorkoutTab();
     } else if (action === 'open-exo-stats-quick') {
@@ -1782,7 +1727,7 @@ function setupEvents() {
     } else if (action === 'finish-workout') {
       finishActiveWorkout();
     } else if (action === 'cancel-workout') {
-      if (confirm('Abandonner la séance en cours sans l’enregistrer ?')) {
+      if (confirm('Abandonner la séance en cours ?')) {
         state.activeWorkout = null;
         stopRestTimer();
         saveState();
@@ -1793,7 +1738,7 @@ function setupEvents() {
     } else if (action === 'edit-template') {
       openTemplateModal(btn.dataset.id);
     } else if (action === 'delete-template') {
-      if (confirm('Supprimer cette séance type ?')) {
+      if (confirm('Supprimer cette séance ?')) {
         state.templates = state.templates.filter((t) => t.id !== btn.dataset.id);
         saveState();
         renderTemplatesTab();
@@ -1806,7 +1751,7 @@ function setupEvents() {
       state.ui.statMetric = btn.dataset.metric;
       renderStatsTab();
     } else if (action === 'delete-history-wk') {
-      if (confirm('Supprimer cette séance de ton historique ?')) {
+      if (confirm('Supprimer cette séance de l’historique ?')) {
         state.history = state.history.filter((h) => h.id !== btn.dataset.id);
         saveState();
         renderWorkoutTab();
@@ -1817,7 +1762,7 @@ function setupEvents() {
       if ('Notification' in window) {
         Notification.requestPermission().then(() => renderSettingsTab());
       } else {
-        showToast('Installe l’application sur l’écran d’accueil iOS d’abord.');
+        showToast('Ajoute d’abord l’app sur l’écran d’accueil');
       }
     } else if (action === 'open-watch-guide') {
       openWatchGuideModal();
@@ -1830,7 +1775,6 @@ function setupEvents() {
     }
   });
 
-  // Live Input Delegation (Weight, Reps, Left/Right Reps, Exercise Note)
   main.addEventListener('input', (e) => {
     const inputType = e.target.dataset.input;
     if (!inputType) return;
@@ -1857,16 +1801,16 @@ function setupEvents() {
 
 function openSwapOrAddExoModal(replaceIdx = null) {
   const listHtml = state.exercises.map((ex) => `
-    <button type="button" class="card pick-live-exo-btn" data-id="${ex.id}" style="width:100%; text-align:left; padding:12px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+    <button type="button" class="card pick-live-exo-btn" data-id="${ex.id}" style="width:100%; text-align:left; padding:14px 16px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:var(--surface-2);">
       <div>
-        <div style="font-weight:700;">${escapeHtml(ex.name)}</div>
-        <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(ex.muscle)}</div>
+        <div style="font-weight:800;">${escapeHtml(ex.name)}</div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">${escapeHtml(ex.muscle)}</div>
       </div>
-      <span class="badge ${ex.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">${ex.unilateral ? 'Unilatéral G/D' : 'Bilatéral'}</span>
+      <span class="badge ${ex.unilateral ? 'badge-unilateral' : 'badge-bilateral'}">${ex.unilateral ? 'G/D' : '2 côtés'}</span>
     </button>
   `).join('');
 
-  openModal(replaceIdx !== null ? '🔄 Remplacer l’exercice' : '+ Ajouter un exercice', `
+  openModal(replaceIdx !== null ? 'Remplacer l’exercice' : 'Ajouter un exercice', `
     <div style="margin-bottom:12px;">
       <button type="button" class="btn btn-secondary btn-block btn-sm" id="modal-new-exo-inline">+ Créer un nouvel exercice</button>
     </div>
@@ -1874,9 +1818,7 @@ function openSwapOrAddExoModal(replaceIdx = null) {
   `);
 
   document.getElementById('modal-new-exo-inline').addEventListener('click', () => {
-    openExerciseModal(null, (created) => {
-      applyLiveExerciseSelection(created.id, replaceIdx);
-    });
+    openExerciseModal(null, (created) => applyLiveExerciseSelection(created.id, replaceIdx));
   });
 
   document.querySelectorAll('.pick-live-exo-btn').forEach((btn) => {
@@ -1929,7 +1871,6 @@ function finishActiveWorkout() {
   const wk = state.activeWorkout;
   if (!wk) return;
 
-  // Mark sets that have weight & reps filled in as done if user forgot to tick them
   let anyDone = false;
   wk.exercises.forEach((ex) => {
     ex.sets.forEach((s) => {
@@ -1945,7 +1886,7 @@ function finishActiveWorkout() {
   });
 
   if (!anyDone) {
-    showToast('⚠️ Remplis ou valide au moins une série avant de terminer.');
+    showToast('Valide au moins une série');
     return;
   }
 
@@ -1961,9 +1902,9 @@ function finishActiveWorkout() {
 
   state.activeWorkout = null;
   stopRestTimer();
-  saveState(true); // Also auto-syncs to Cloud if configured!
+  saveState(true);
   renderAll();
-  showToast('🎉 Séance enregistrée dans tes statistiques !', true);
+  showToast('Séance enregistrée !', true);
 }
 
 function openHistoryDetailModal(wkId) {
@@ -1974,20 +1915,20 @@ function openHistoryDetailModal(wkId) {
     const exoObj = getExercise(ex.exerciseId);
     const setsLines = (ex.sets || []).filter((s) => s.done).map((s, i) => {
       const perf = ex.unilateral
-        ? `${s.weight} kg/côté • Gauche: ${s.repsLeft} reps | Droite: ${s.repsRight} reps`
+        ? `${s.weight} kg/côté • G: ${s.repsLeft} | D: ${s.repsRight}`
         : `${s.weight} kg × ${s.reps} reps`;
-      return `<div style="font-size:0.82rem; padding:4px 0; color:var(--text-secondary);">Série ${s.tag || (i + 1)} : <strong style="color:#fff;">${perf}</strong> ${s.rir ? `(@RIR ${s.rir})` : ''}</div>`;
+      return `<div style="font-size:0.84rem; padding:5px 0; color:var(--text-secondary);">Série ${s.tag || (i + 1)} — <strong style="color:#fff;">${perf}</strong></div>`;
     }).join('');
 
     return `
-      <div class="card" style="padding:12px; margin-bottom:10px;">
-        <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(exoObj ? exoObj.name : 'Exercice')}</div>
+      <div style="background:var(--surface-2); border-radius:20px; padding:14px; margin-bottom:10px;">
+        <div style="font-weight:800; margin-bottom:6px;">${escapeHtml(exoObj ? exoObj.name : 'Exercice')}</div>
         ${setsLines}
       </div>
     `;
   }).join('');
 
-  openModal(`${wk.name} (${formatDateShort(wk.date)})`, html);
+  openModal(`${wk.name}`, html);
 }
 
 function exportDataJson() {
@@ -2002,12 +1943,12 @@ function exportDataJson() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ironpulse-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `pulse-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  showToast('💾 Fichier de sauvegarde téléchargé !');
+  showToast('Sauvegarde exportée');
 }
 
 function handleJsonImport(e) {
@@ -2017,40 +1958,43 @@ function handleJsonImport(e) {
   reader.onload = (ev) => {
     try {
       const parsed = JSON.parse(ev.target.result);
-      if (!Array.isArray(parsed.exercises)) throw new Error('Invalid format');
+      if (!Array.isArray(parsed.exercises)) throw new Error('Invalid');
       state.exercises = parsed.exercises;
       state.templates = parsed.templates || [];
       state.history = parsed.history || [];
       saveState();
       renderAll();
-      showToast('✅ Sauvegarde importée avec succès !');
+      showToast('Sauvegarde importée');
     } catch {
-      showToast('⚠️ Fichier JSON invalide.');
+      showToast('Fichier invalide');
     }
   };
   reader.readAsText(file);
 }
-
-/* ==========================================================================
-   Navigation & Bootstrap
-   ========================================================================== */
 
 function switchTab(tabName) {
   state.ui.activeTab = tabName;
   document.querySelectorAll('.tab-view').forEach((sec) => sec.classList.remove('active'));
   document.getElementById(`tab-${tabName}`).classList.add('active');
 
-  document.querySelectorAll('.nav-item').forEach((b) => {
+  document.querySelectorAll('.dock-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === tabName);
   });
 
-  const titles = {
-    workout: state.activeWorkout ? 'Séance en cours' : "S'entraîner",
-    templates: 'Mes Séances & Exos',
-    stats: 'Statistiques & PR',
-    settings: 'Apple Watch & Cloud'
+  const kickers = {
+    workout: state.activeWorkout ? 'EN DIRECT' : "AUJOURD'HUI",
+    templates: 'PROGRAMMATION',
+    stats: 'ANALYTIQUE',
+    settings: 'SYSTÈME'
   };
-  document.getElementById('page-title').textContent = titles[tabName] || 'IronPulse';
+  const titles = {
+    workout: state.activeWorkout ? 'Séance active' : 'Entraînement',
+    templates: 'Programmes',
+    stats: 'Progrès & PR',
+    settings: 'Watch & Cloud'
+  };
+  document.getElementById('page-kicker').textContent = kickers[tabName] || 'PULSE';
+  document.getElementById('page-title').textContent = titles[tabName] || 'PULSE';
   renderAll();
 }
 
