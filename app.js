@@ -25,6 +25,7 @@ let state = {
   history: [],
   activeWorkout: null,
   settings: {
+    userId: '',
     autoStartTimer: true,
     soundEnabled: true,
     watchShortcutAuto: false,
@@ -135,17 +136,36 @@ async function loadState() {
     state.history = Array.isArray(parsed.history) ? parsed.history : [];
     state.activeWorkout = parsed.activeWorkout || null;
     state.settings = { ...state.settings, ...(parsed.settings || {}) };
+    if (!state.settings.userId) {
+      state.settings.userId = generateUserSlug();
+      saveState(false);
+    }
   } else {
     state.exercises = [];
     state.templates = [];
     state.history = [];
     state.activeWorkout = null;
-    saveState();
+    state.settings.userId = generateUserSlug();
+    saveState(false);
   }
 
   if (state.exercises.length > 0 && !getExercise(state.ui.selectedStatExoId)) {
     state.ui.selectedStatExoId = state.exercises[0].id;
   }
+}
+
+function generateUserSlug() {
+  return `athlete_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sanitizeUserSlug(raw) {
+  const cleaned = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return cleaned || generateUserSlug();
 }
 
 async function syncToCloud(silent = false) {
@@ -157,6 +177,7 @@ async function syncToCloud(silent = false) {
   try {
     const endpoint = normalizeCloudUrl(url);
     const payload = {
+      userId: state.settings.userId,
       updatedAt: new Date().toISOString(),
       exercises: state.exercises,
       templates: state.templates,
@@ -171,7 +192,7 @@ async function syncToCloud(silent = false) {
     state.settings.lastCloudSync = new Date().toISOString();
     saveState(false);
     if (!silent) {
-      showToast('Synchronisé sur le Cloud');
+      showToast(`Synchronisé (${state.settings.userId})`);
       renderSettingsTab();
     }
   } catch {
@@ -191,7 +212,7 @@ async function restoreFromCloud() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || !Array.isArray(data.exercises)) {
-      showToast('Aucune sauvegarde trouvée');
+      showToast(`Aucune sauvegarde pour "${state.settings.userId}"`);
       return;
     }
     state.exercises = data.exercises;
@@ -200,7 +221,7 @@ async function restoreFromCloud() {
     state.settings.lastCloudSync = new Date().toISOString();
     saveState(false);
     renderAll();
-    showToast('Données restaurées depuis le Cloud');
+    showToast(`Données restaurées (${state.settings.userId})`);
   } catch {
     showToast('Impossible de récupérer les données');
   }
@@ -208,8 +229,11 @@ async function restoreFromCloud() {
 
 function normalizeCloudUrl(url) {
   let clean = url.replace(/\/+$/, '');
+  const userKey = sanitizeUserSlug(state.settings.userId);
   if (clean.includes('firebaseio.com') || clean.includes('firebasedatabase.app')) {
-    if (!clean.endsWith('.json')) clean += '/ironpulse_backup.json';
+    if (!clean.endsWith('.json')) {
+      clean += `/users/${userKey}/pulse_backup.json`;
+    }
   }
   return clean;
 }
@@ -1319,7 +1343,17 @@ function renderSettingsTab() {
     </div>
 
     <div class="runway-header">
-      <span class="runway-title">Synchronisation Cloud & Fichier</span>
+      <span class="runway-title">Synchronisation Cloud & Multi-Utilisateurs</span>
+    </div>
+
+    <div style="padding:12px 0 18px; border-bottom:1px solid var(--hairline);">
+      <div style="font-size:0.75rem; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">
+        Ton Identifiant Personnel (isole tes stats sur le Cloud)
+      </div>
+      <input type="text" id="cloud-user-id-input" class="open-input-line" placeholder="Ex: julien_92, lucas..." value="${escapeAttr(state.settings.userId || '')}" />
+      <div style="font-size:0.76rem; color:var(--text-dim); margin-top:6px;">
+        Chaque appareil possède ses propres données locales. Si plusieurs personnes utilisent le Cloud, cet identifiant sépare automatiquement vos sauvegardes (<code>/users/${escapeHtml(sanitizeUserSlug(state.settings.userId))}</code>).
+      </div>
     </div>
 
     <div style="padding:12px 0 20px; border-bottom:1px solid var(--hairline);">
@@ -1352,6 +1386,16 @@ function renderSettingsTab() {
       state.settings.watchShortcutAuto = e.target.checked;
       saveState();
       showToast(e.target.checked ? 'Relais Apple Watch activé' : 'Relais désactivé');
+    });
+  }
+
+  const userIdInput = document.getElementById('cloud-user-id-input');
+  if (userIdInput) {
+    userIdInput.addEventListener('change', (e) => {
+      state.settings.userId = sanitizeUserSlug(e.target.value);
+      saveState();
+      renderSettingsTab();
+      showToast(`Identifiant : ${state.settings.userId}`);
     });
   }
 
@@ -2051,7 +2095,9 @@ function openHistoryDetailModal(wkId) {
 }
 
 function exportDataJson() {
+  const userSlug = sanitizeUserSlug(state.settings.userId);
   const dataStr = JSON.stringify({
+    userId: userSlug,
     exportedAt: new Date().toISOString(),
     exercises: state.exercises,
     templates: state.templates,
@@ -2062,7 +2108,7 @@ function exportDataJson() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `pulse-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `pulse-backup-${userSlug}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2168,7 +2214,7 @@ async function initApp() {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
       reg.update();
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update();
