@@ -27,7 +27,9 @@ let state = {
   settings: {
     userId: '',
     autoStartTimer: true,
-    soundEnabled: true,
+    watchOnlyMode: true,
+    hidePhoneTimerWhenWatch: true,
+    soundEnabled: false,
     watchShortcutAuto: false,
     watchShortcutName: 'IronPulse Timer',
     cloudUrl: '',
@@ -135,11 +137,17 @@ async function loadState() {
     state.templates = Array.isArray(parsed.templates) ? parsed.templates : [];
     state.history = Array.isArray(parsed.history) ? parsed.history : [];
     state.activeWorkout = parsed.activeWorkout || null;
-    state.settings = { ...state.settings, ...(parsed.settings || {}) };
+    const savedSettings = parsed.settings || {};
+    if (savedSettings.watchOnlyMode === undefined) {
+      savedSettings.watchOnlyMode = true;
+      savedSettings.hidePhoneTimerWhenWatch = true;
+      savedSettings.soundEnabled = false;
+    }
+    state.settings = { ...state.settings, ...savedSettings };
     if (!state.settings.userId) {
       state.settings.userId = generateUserSlug();
-      saveState(false);
     }
+    saveState(false);
   } else {
     state.exercises = [];
     state.templates = [];
@@ -365,11 +373,31 @@ function checkSetPR(exerciseId, setObj, isUnilateral) {
 }
 
 /* ==========================================================================
+   Biset Helper (Pairs of Linked Exercises: A1/A2, B1/B2...)
+   ========================================================================== */
+
+function getBisetMap(list) {
+  const map = new Map();
+  if (!Array.isArray(list)) return map;
+  let groupIndex = 0;
+  for (let i = 0; i < list.length - 1; i++) {
+    if (list[i] && list[i].bisetWithNext && list[i + 1]) {
+      const letter = String.fromCharCode(65 + (groupIndex % 26));
+      map.set(i, { role: 'first', partnerIdx: i + 1, code: `${letter}1`, partnerCode: `${letter}2`, group: letter });
+      map.set(i + 1, { role: 'second', partnerIdx: i, code: `${letter}2`, partnerCode: `${letter}1`, group: letter });
+      groupIndex++;
+      i++;
+    }
+  }
+  return map;
+}
+
+/* ==========================================================================
    Dynamic Island Rest Timer & Apple Watch Relay (Default 3m = 180s)
    ========================================================================== */
 
 function playTimerBeep() {
-  if (!state.settings.soundEnabled) return;
+  if (state.settings.watchOnlyMode || !state.settings.soundEnabled) return;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
@@ -397,6 +425,15 @@ function triggerWatchShortcut(seconds) {
 
 function startRestTimer(seconds, exoName = 'Repos') {
   const dur = Math.max(15, parseInt(seconds) || DEFAULT_REST_SEC);
+
+  // Si le relais Apple Watch est activé et qu'on veut le minuteur uniquement sur la montre :
+  if (state.settings.watchShortcutAuto && state.settings.watchOnlyMode && state.settings.hidePhoneTimerWhenWatch) {
+    stopRestTimer();
+    triggerWatchShortcut(dur);
+    showToast(`⌚ Minuteur envoyé sur ta Watch (${formatDuration(dur)})`);
+    return;
+  }
+
   restTimer.active = true;
   restTimer.totalSec = dur;
   restTimer.endTime = Date.now() + dur * 1000;
@@ -453,18 +490,24 @@ function stopRestTimer() {
 function finishRestTimer() {
   const exoName = restTimer.exoName;
   stopRestTimer();
-  playTimerBeep();
-  if (navigator.vibrate) navigator.vibrate([250, 120, 250]);
+
+  // En mode "Montre uniquement", pas de bip dans les écouteurs/téléphone ni de vibration iPhone
+  if (!state.settings.watchOnlyMode) {
+    playTimerBeep();
+    if (navigator.vibrate) navigator.vibrate([250, 120, 250]);
+  }
   showToast(`Repos terminé • ${exoName}`, true);
 
-  if ('Notification' in window && Notification.permission === 'granted') {
+  // Si le raccourci natif Watch n'est pas utilisé, la notification silencieuse permet de faire vibrer l'Apple Watch (iPhone verrouillé) sans sonner dans les écouteurs
+  if (!state.settings.watchShortcutAuto && 'Notification' in window && Notification.permission === 'granted') {
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.showNotification('Repos terminé', {
           body: `Prêt pour ta série sur ${exoName}`,
           icon: 'icon.svg',
           tag: 'ironpulse-rest-timer',
-          renotify: true
+          renotify: true,
+          silent: !!state.settings.watchOnlyMode
         });
       });
     }
@@ -509,6 +552,7 @@ function startWorkoutFromTemplate(templateId) {
       targetReps: item.targetReps || '8-12',
       restSeconds: item.restSeconds || (exo ? exo.defaultRest : DEFAULT_REST_SEC) || DEFAULT_REST_SEC,
       unilateral: isUni,
+      bisetWithNext: !!item.bisetWithNext,
       sets
     };
   });
@@ -608,12 +652,17 @@ function renderWorkoutLauncher(container) {
       </div>
     `
     : state.templates.map((tpl, idx) => {
-        const exoRows = tpl.items.map((it) => {
+        const bisetMap = getBisetMap(tpl.items);
+        const exoRows = tpl.items.map((it, i) => {
           const exo = getExercise(it.exerciseId);
           if (!exo) return '';
+          const bInfo = bisetMap.get(i);
           return `
             <div class="strip-exo-row">
-              <span class="strip-exo-name">${escapeHtml(exo.name)}</span>
+              <span class="strip-exo-name">
+                ${bInfo ? `<strong style="color:var(--volt); font-size:0.74rem; margin-right:4px;">⚡${bInfo.code}</strong>` : ''}
+                ${escapeHtml(exo.name)}
+              </span>
               <span class="strip-exo-target">${it.setsCount} × ${escapeHtml(it.targetReps)}</span>
             </div>
           `;
@@ -696,6 +745,8 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
   const savedRibbonScroll = prevRibbon ? prevRibbon.scrollLeft : 0;
 
   const wk = state.activeWorkout;
+  const bisetMap = getBisetMap(wk.exercises);
+
   let completedSets = 0;
   let totalSets = 0;
   wk.exercises.forEach((ex) => {
@@ -709,22 +760,33 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
     state.ui.focusedExoIdx = Math.max(0, wk.exercises.length - 1);
   }
 
+  // Si un exercice fait partie d'un Biset et est sélectionné, on affiche les 2 exercices du Biset ensemble
+  let indicesToRender = [];
+  if (state.ui.focusedExoIdx === 'all') {
+    indicesToRender = wk.exercises.map((_, i) => i);
+  } else if (wk.exercises.length > 0) {
+    const fIdx = state.ui.focusedExoIdx;
+    const bInfo = bisetMap.get(fIdx);
+    if (bInfo) {
+      indicesToRender = bInfo.role === 'first' ? [fIdx, bInfo.partnerIdx] : [bInfo.partnerIdx, fIdx];
+    } else {
+      indicesToRender = [fIdx];
+    }
+  }
+
   // Horizontal Exercise Focus Deck Ribbon
   const deckPills = wk.exercises.map((wExo, idx) => {
     const exo = getExercise(wExo.exerciseId);
     const allDone = wExo.sets.length > 0 && wExo.sets.every((s) => s.done);
-    const isFocused = state.ui.focusedExoIdx === idx;
+    const bInfo = bisetMap.get(idx);
+    const isFocused = state.ui.focusedExoIdx === idx || (state.ui.focusedExoIdx !== 'all' && indicesToRender.includes(idx));
     return `
       <button type="button" class="deck-pill ${isFocused ? 'active' : ''} ${allDone ? 'done-all' : ''}" data-action="focus-exo-pill" data-idx="${idx}">
-        <span>0${idx + 1}</span>
+        <span>${bInfo ? `⚡${bInfo.code}` : `0${idx + 1}`}</span>
         <span>${escapeHtml(exo ? exo.name : 'Exercice')}</span>
       </button>
     `;
   }).join('');
-
-  const indicesToRender = state.ui.focusedExoIdx === 'all'
-    ? wk.exercises.map((_, i) => i)
-    : (wk.exercises.length > 0 ? [state.ui.focusedExoIdx] : []);
 
   const stagesHtml = indicesToRender.map((exoIdx) => {
     const wExo = wk.exercises[exoIdx];
@@ -737,6 +799,7 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
     };
     const isUni = !!wExo.unilateral;
     const prevPerf = getPreviousExercisePerf(wExo.exerciseId);
+    const bInfo = bisetMap.get(exoIdx);
 
     let normalCounter = 0;
     const spineRowsHtml = wExo.sets.map((s, setIdx) => {
@@ -814,13 +877,44 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
       `;
     }).join('');
 
-    const nextIdx = exoIdx + 1 < wk.exercises.length ? exoIdx + 1 : null;
+    const lastRenderedIdx = indicesToRender[indicesToRender.length - 1];
+    const nextIdx = lastRenderedIdx + 1 < wk.exercises.length ? lastRenderedIdx + 1 : null;
+
+    // Bouton Biset (lier avec le suivant ou détacher si déjà en biset)
+    let bisetBtnHtml = '';
+    if (bInfo && bInfo.role === 'first') {
+      bisetBtnHtml = `
+        <button type="button" class="glass-tag biset" data-action="toggle-live-biset" data-exo-idx="${exoIdx}" title="Détacher le Biset">
+          ⚡ Biset ${bInfo.code}+${bInfo.partnerCode} (Détacher)
+        </button>
+      `;
+    } else if (bInfo && bInfo.role === 'second') {
+      bisetBtnHtml = `
+        <button type="button" class="glass-tag biset" data-action="toggle-live-biset" data-exo-idx="${bInfo.partnerIdx}" title="Détacher le Biset">
+          ⚡ Biset ${bInfo.partnerCode}+${bInfo.code} (Détacher)
+        </button>
+      `;
+    } else if (exoIdx < wk.exercises.length - 1 && !bisetMap.has(exoIdx + 1)) {
+      bisetBtnHtml = `
+        <button type="button" class="glass-tag" data-action="toggle-live-biset" data-exo-idx="${exoIdx}" title="Lier en Biset avec l'exercice suivant">
+          ⚡ Biset ↓
+        </button>
+      `;
+    }
+
+    const bridgeAfterStageHtml = (bInfo && bInfo.role === 'first') ? `
+      <div class="biset-bridge">
+        <span>⚡ BISET ${bInfo.group} (${bInfo.code} ↔ ${bInfo.partnerCode}) — Enchaîne directement sur le mouvement 2</span>
+      </div>
+    ` : '';
 
     return `
-      <div class="exo-stage">
+      <div class="exo-stage" id="live-exo-stage-${exoIdx}">
         <div class="exo-stage-top">
           <div style="flex:1;">
-            <span class="exo-stage-kicker">MOUVEMENT 0${exoIdx + 1} SUR 0${wk.exercises.length}</span>
+            <span class="exo-stage-kicker">
+              ${bInfo ? `⚡ BISET ${bInfo.code} • ` : ''}MOUVEMENT 0${exoIdx + 1} SUR 0${wk.exercises.length}
+            </span>
             <h2 class="exo-stage-title">${escapeHtml(exo.name)}</h2>
             <div class="exo-stage-tags">
               <button type="button" class="glass-tag ${isUni ? 'uni' : 'bi'}" data-action="toggle-live-unilateral" data-exo-idx="${exoIdx}">
@@ -830,9 +924,12 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
               <button type="button" class="glass-tag" data-action="edit-live-rest" data-exo-idx="${exoIdx}">
                 ⏱️ Repos ${formatDuration(wExo.restSeconds || DEFAULT_REST_SEC)}
               </button>
+              ${bisetBtnHtml}
             </div>
           </div>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+            ${exoIdx > 0 ? `<button type="button" class="circle-icon-btn" data-action="move-live-exo-up" data-exo-idx="${exoIdx}" title="Monter l'exercice">↑</button>` : ''}
+            ${exoIdx < wk.exercises.length - 1 ? `<button type="button" class="circle-icon-btn" data-action="move-live-exo-down" data-exo-idx="${exoIdx}" title="Descendre l'exercice">↓</button>` : ''}
             <button type="button" class="circle-icon-btn" data-action="open-exo-stats-quick" data-exo-id="${exo.id}" title="Courbes">${ICONS.chart}</button>
             <button type="button" class="circle-icon-btn" data-action="swap-live-exo" data-exo-idx="${exoIdx}" title="Remplacer">${ICONS.swap}</button>
             <button type="button" class="circle-icon-btn" data-action="remove-live-exo" data-exo-idx="${exoIdx}" title="Retirer">${ICONS.close}</button>
@@ -853,22 +950,24 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
             <button type="button" class="btn btn-secondary btn-sm" data-action="add-live-set" data-exo-idx="${exoIdx}">+ Série</button>
             ${wExo.sets.length > 1 ? `<button type="button" class="btn btn-sm" style="color:var(--text-ghost);" data-action="remove-live-set" data-exo-idx="${exoIdx}">- Série</button>` : ''}
           </div>
-          ${state.ui.focusedExoIdx !== 'all' && nextIdx !== null ? `
+          ${state.ui.focusedExoIdx !== 'all' && exoIdx === lastRenderedIdx && nextIdx !== null ? `
             <button type="button" class="btn btn-ghost btn-sm" data-action="focus-exo-pill" data-idx="${nextIdx}">
               Exo suivant →
             </button>
           ` : ''}
         </div>
       </div>
+      ${bridgeAfterStageHtml}
     `;
   }).join('');
 
   container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:8px;">
       <div>
         <div style="font-size:0.74rem; color:var(--text-dim); font-weight:700;">${escapeHtml(wk.name)} • ${completedSets}/${totalSets} séries</div>
       </div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        ${wk.exercises.length > 1 ? `<button type="button" class="btn btn-secondary btn-sm" data-action="open-reorder-live-modal" title="Réorganiser les exercices et bisets">↕ Ordre</button>` : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="add-exo-to-live">+ Exo</button>
         <button type="button" class="btn btn-primary btn-sm" data-action="finish-workout">Valider ✓</button>
       </div>
@@ -922,15 +1021,18 @@ function renderTemplatesTab() {
       </div>
     `
     : state.templates.map((tpl, idx) => {
+        const bisetMap = getBisetMap(tpl.items);
         const exoLines = tpl.items.map((item, i) => {
           const exo = getExercise(item.exerciseId);
           if (!exo) return '';
+          const bInfo = bisetMap.get(i);
           return `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:0.88rem;">
               <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <span style="color:var(--volt); font-weight:900; font-size:0.74rem;">0${i + 1}</span>
+                <span style="color:var(--volt); font-weight:900; font-size:0.74rem;">${bInfo ? `⚡${bInfo.code}` : `0${i + 1}`}</span>
                 <strong style="font-weight:700;">${escapeHtml(exo.name)}</strong>
                 ${exo.unilateral ? `<span style="font-size:0.7rem; color:var(--orchid); font-weight:800;">G/D</span>` : ''}
+                ${bInfo ? `<span style="font-size:0.68rem; color:var(--volt); font-weight:800;">BISET</span>` : ''}
               </div>
               <span style="color:var(--text-dim); font-weight:700;">${item.setsCount} × ${escapeHtml(item.targetReps)} • ${formatDuration(item.restSeconds || DEFAULT_REST_SEC)}</span>
             </div>
@@ -1320,25 +1422,43 @@ function renderSettingsTab() {
 
     <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
       <div>
+        <div style="font-weight:800; font-size:0.98rem;">Mode Montre Uniquement (Zéro son Tel / Écouteurs)</div>
+        <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">Coupe le bip dans tes écouteurs et sur l'iPhone : seule ta montre te prévient</div>
+      </div>
+      <input type="checkbox" id="toggle-watch-only" ${state.settings.watchOnlyMode ? 'checked' : ''} style="width:24px; height:24px; accent-color:var(--volt);" />
+    </div>
+
+    <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div>
+        <div style="font-weight:800; font-size:0.98rem;">Relais Minuteur Natif Watch</div>
+        <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">Envoie directement le chrono sur ta montre sans afficher ni faire sonner celui du tel</div>
+      </div>
+      <input type="checkbox" id="toggle-watch-shortcut" ${state.settings.watchShortcutAuto ? 'checked' : ''} style="width:24px; height:24px; accent-color:var(--volt);" />
+    </div>
+
+    ${state.settings.watchShortcutAuto ? `
+      <div style="padding:14px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <div>
+          <div style="font-weight:800; font-size:0.92rem;">Masquer aussi le bandeau chrono sur l'iPhone</div>
+          <div style="font-size:0.76rem; color:var(--text-dim); margin-top:2px;">Le minuteur tourne uniquement sur l'Apple Watch (aucun doublon sur le tel)</div>
+        </div>
+        <input type="checkbox" id="toggle-hide-phone-timer" ${state.settings.hidePhoneTimerWhenWatch ? 'checked' : ''} style="width:22px; height:22px; accent-color:var(--volt);" />
+      </div>
+    ` : ''}
+
+    <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div>
         <div style="font-weight:800; font-size:0.98rem;">Notifications iOS / Watch</div>
-        <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">Fait vibrer l'Apple Watch quand l'iPhone est verrouillé</div>
+        <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">Fait vibrer l'Apple Watch quand l'iPhone est verrouillé (sans relais Raccourcis)</div>
       </div>
       <button type="button" class="btn btn-secondary btn-sm" data-action="request-notif-perm">
         ${notifStatus === 'granted' ? 'Activé' : 'Activer'}
       </button>
     </div>
 
-    <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
-      <div>
-        <div style="font-weight:800; font-size:0.98rem;">Relais Minuteur Natif Watch</div>
-        <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">Lance automatiquement le minuteur Apple Watch à chaque série</div>
-      </div>
-      <input type="checkbox" id="toggle-watch-shortcut" ${state.settings.watchShortcutAuto ? 'checked' : ''} style="width:24px; height:24px; accent-color:var(--volt);" />
-    </div>
-
     <div style="padding:14px 0 28px;">
       <button type="button" class="btn btn-ghost" data-action="open-watch-guide">
-        Guide Raccourci iOS "IronPulse Timer" →
+        Guide : Vibrer uniquement sur la Watch (0 son écouteurs/tel) →
       </button>
     </div>
 
@@ -1380,12 +1500,33 @@ function renderSettingsTab() {
     </div>
   `;
 
+  const watchOnlyToggle = document.getElementById('toggle-watch-only');
+  if (watchOnlyToggle) {
+    watchOnlyToggle.addEventListener('change', (e) => {
+      state.settings.watchOnlyMode = e.target.checked;
+      state.settings.soundEnabled = !e.target.checked;
+      saveState();
+      renderSettingsTab();
+      showToast(e.target.checked ? 'Mode Montre Uniquement activé (0 son écouteurs/tel)' : 'Son téléphone/écouteurs réactivé');
+    });
+  }
+
   const watchToggle = document.getElementById('toggle-watch-shortcut');
   if (watchToggle) {
     watchToggle.addEventListener('change', (e) => {
       state.settings.watchShortcutAuto = e.target.checked;
       saveState();
+      renderSettingsTab();
       showToast(e.target.checked ? 'Relais Apple Watch activé' : 'Relais désactivé');
+    });
+  }
+
+  const hidePhoneToggle = document.getElementById('toggle-hide-phone-timer');
+  if (hidePhoneToggle) {
+    hidePhoneToggle.addEventListener('change', (e) => {
+      state.settings.hidePhoneTimerWhenWatch = e.target.checked;
+      saveState();
+      showToast(e.target.checked ? 'Minuteur masqué sur l’iPhone' : 'Minuteur affiché aussi sur l’iPhone');
     });
   }
 
@@ -1498,11 +1639,12 @@ function openTemplateModal(templateId = null) {
           unilateral: ex ? !!ex.unilateral : false,
           setsCount: it.setsCount || 3,
           targetReps: it.targetReps || '8-12',
-          restSeconds: it.restSeconds || DEFAULT_REST_SEC
+          restSeconds: it.restSeconds || DEFAULT_REST_SEC,
+          bisetWithNext: !!it.bisetWithNext
         };
       })
     : [
-        { exoName: '', unilateral: false, setsCount: 3, targetReps: '8-10', restSeconds: DEFAULT_REST_SEC }
+        { exoName: '', unilateral: false, setsCount: 3, targetReps: '8-10', restSeconds: DEFAULT_REST_SEC, bisetWithNext: false }
       ];
 
   function renderModalContent(focusIndex = null) {
@@ -1510,11 +1652,25 @@ function openTemplateModal(templateId = null) {
       (ex) => `<option value="${escapeAttr(ex.name)}"></option>`
     ).join('');
 
-    const itemsHtml = draftItems.map((it, idx) => `
+    const bisetMap = getBisetMap(draftItems);
+
+    const itemsHtml = draftItems.map((it, idx) => {
+      const bInfo = bisetMap.get(idx);
+      const canBisetNext = idx < draftItems.length - 1 && (!bInfo || bInfo.role === 'first');
+      const isBisetFirst = bInfo && bInfo.role === 'first';
+
+      return `
       <div style="padding:16px 0; border-bottom:1px solid var(--hairline);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-weight:900; font-size:0.74rem; color:var(--volt); letter-spacing:0.1em;">MOUVEMENT 0${idx + 1}</span>
-          <div style="display:flex; gap:6px; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+          <span style="font-weight:900; font-size:0.74rem; color:var(--volt); letter-spacing:0.1em;">
+            ${bInfo ? `⚡ BISET ${bInfo.code} • ` : ''}MOUVEMENT 0${idx + 1}
+          </span>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            ${canBisetNext ? `
+              <button type="button" class="glass-tag ${isBisetFirst ? 'biset' : ''} tpl-toggle-biset" data-idx="${idx}" title="Lier en Biset avec le mouvement suivant">
+                ${isBisetFirst ? `⚡ Biset ${bInfo.code}+${bInfo.partnerCode}` : '⚡ Biset ↓'}
+              </button>
+            ` : ''}
             <button type="button" class="glass-tag ${it.unilateral ? 'uni' : 'bi'} tpl-toggle-uni" data-idx="${idx}">
               ${it.unilateral ? '🦿 Unilatéral G/D' : '🏋️ Bilatéral'}
             </button>
@@ -1549,7 +1705,13 @@ function openTemplateModal(templateId = null) {
           </label>
         </div>
       </div>
-    `).join('');
+      ${isBisetFirst ? `
+        <div class="biset-bridge" style="margin:0;">
+          <span>⚡ EN BISET AVEC LE MOUVEMENT 0${idx + 2} (pas de repos entre ${bInfo.code} et ${bInfo.partnerCode})</span>
+        </div>
+      ` : ''}
+    `;
+    }).join('');
 
     openModal(existing ? 'Modifier la séance' : 'Composer une séance', `
       <datalist id="existing-exos-datalist">${datalistOptions}</datalist>
@@ -1591,9 +1753,20 @@ function openTemplateModal(templateId = null) {
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          draftItems.push({ exoName: '', unilateral: false, setsCount: 3, targetReps: '8-10', restSeconds: DEFAULT_REST_SEC });
+          draftItems.push({ exoName: '', unilateral: false, setsCount: 3, targetReps: '8-10', restSeconds: DEFAULT_REST_SEC, bisetWithNext: false });
           renderModalContent(draftItems.length - 1);
         }
+      });
+    });
+
+    document.querySelectorAll('.tpl-toggle-biset').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const i = parseInt(e.currentTarget.dataset.idx);
+        draftItems[i].bisetWithNext = !draftItems[i].bisetWithNext;
+        if (draftItems[i].bisetWithNext && i > 0) {
+          draftItems[i - 1].bisetWithNext = false;
+        }
+        renderModalContent();
       });
     });
 
@@ -1646,7 +1819,8 @@ function openTemplateModal(templateId = null) {
         unilateral: false,
         setsCount: 3,
         targetReps: '8-10',
-        restSeconds: DEFAULT_REST_SEC
+        restSeconds: DEFAULT_REST_SEC,
+        bisetWithNext: false
       });
       renderModalContent(draftItems.length - 1);
     });
@@ -1664,7 +1838,8 @@ function openTemplateModal(templateId = null) {
             exerciseId: exoObj.id,
             setsCount: parseInt(it.setsCount) || 3,
             targetReps: it.targetReps || '8-10',
-            restSeconds: parseInt(it.restSeconds) || DEFAULT_REST_SEC
+            restSeconds: parseInt(it.restSeconds) || DEFAULT_REST_SEC,
+            bisetWithNext: !!it.bisetWithNext
           });
         }
       });
@@ -1690,18 +1865,131 @@ function openTemplateModal(templateId = null) {
   renderModalContent(0);
 }
 
+function openReorderLiveWorkoutModal() {
+  if (!state.activeWorkout) return;
+
+  function renderOrderSheet() {
+    const wk = state.activeWorkout;
+    const bisetMap = getBisetMap(wk.exercises);
+
+    const rowsHtml = wk.exercises.map((wExo, idx) => {
+      const exo = getExercise(wExo.exerciseId);
+      const bInfo = bisetMap.get(idx);
+      const isBisetFirst = bInfo && bInfo.role === 'first';
+      const canBisetNext = idx < wk.exercises.length - 1 && (!bInfo || bInfo.role === 'first');
+
+      return `
+        <div style="padding:14px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:0.72rem; font-weight:900; color:var(--volt);">
+              ${bInfo ? `⚡ BISET ${bInfo.code}` : `MOUVEMENT 0${idx + 1}`}
+            </div>
+            <div style="font-weight:800; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(exo ? exo.name : 'Exercice')}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            ${canBisetNext ? `
+              <button type="button" class="glass-tag ${isBisetFirst ? 'biset' : ''} live-modal-biset" data-idx="${idx}">
+                ${isBisetFirst ? `⚡ ${bInfo.code}+${bInfo.partnerCode}` : '⚡ Biset ↓'}
+              </button>
+            ` : ''}
+            ${idx > 0 ? `<button type="button" class="circle-icon-btn live-modal-up" style="width:32px; height:32px;" data-idx="${idx}">↑</button>` : ''}
+            ${idx < wk.exercises.length - 1 ? `<button type="button" class="circle-icon-btn live-modal-down" style="width:32px; height:32px;" data-idx="${idx}">↓</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    openModal('Ordre de la séance & Bisets', `
+      <div style="font-size:0.82rem; color:var(--text-dim); margin-bottom:10px;">
+        Déplace tes exercices avec <strong>↑ / ↓</strong> ou lie deux mouvements consécutifs avec <strong>⚡ Biset ↓</strong>.
+      </div>
+      <div>${rowsHtml}</div>
+      <button type="button" class="btn btn-primary btn-block" id="close-reorder-modal-btn" style="margin-top:18px;">Terminé</button>
+    `);
+
+    document.querySelectorAll('.live-modal-up').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        moveLiveExercise(i, -1);
+        renderOrderSheet();
+      });
+    });
+
+    document.querySelectorAll('.live-modal-down').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        moveLiveExercise(i, 1);
+        renderOrderSheet();
+      });
+    });
+
+    document.querySelectorAll('.live-modal-biset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        toggleLiveBiset(i);
+        renderOrderSheet();
+      });
+    });
+
+    document.getElementById('close-reorder-modal-btn').addEventListener('click', closeModal);
+  }
+
+  renderOrderSheet();
+}
+
+function moveLiveExercise(idx, delta) {
+  if (!state.activeWorkout) return;
+  const list = state.activeWorkout.exercises;
+  const targetIdx = idx + delta;
+  if (targetIdx < 0 || targetIdx >= list.length) return;
+
+  [list[idx], list[targetIdx]] = [list[targetIdx], list[idx]];
+  if ( list[list.length - 1] ) {
+    list[list.length - 1].bisetWithNext = false;
+  }
+  if (state.ui.focusedExoIdx !== 'all') {
+    state.ui.focusedExoIdx = targetIdx;
+  }
+  saveState();
+  renderWorkoutTab();
+}
+
+function toggleLiveBiset(idx) {
+  if (!state.activeWorkout) return;
+  const list = state.activeWorkout.exercises;
+  if (idx < 0 || idx >= list.length - 1) return;
+
+  list[idx].bisetWithNext = !list[idx].bisetWithNext;
+  if (list[idx].bisetWithNext && idx > 0) {
+    list[idx - 1].bisetWithNext = false;
+  }
+  if (list[idx].bisetWithNext && idx + 1 < list.length) {
+    list[idx + 1].bisetWithNext = false;
+  }
+  saveState();
+  renderWorkoutTab();
+  const exo1 = getExercise(list[idx].exerciseId);
+  const exo2 = getExercise(list[idx + 1].exerciseId);
+  if (list[idx].bisetWithNext) {
+    showToast(`⚡ Biset : ${exo1 ? exo1.name : 'Exo 1'} + ${exo2 ? exo2.name : 'Exo 2'}`, true);
+  } else {
+    showToast('Biset détaché');
+  }
+}
+
 function openWatchGuideModal() {
-  openModal('Relais Apple Watch', `
+  openModal('Minuteur sur la Montre uniquement', `
     <div style="font-size:0.9rem; line-height:1.6; color:var(--text-dim);">
       <p style="margin-bottom:14px;">
-        Pour déclencher le vrai minuteur natif de ton Apple Watch automatiquement depuis l'appli :
+        Le mode <strong style="color:var(--volt);">Montre Uniquement</strong> de l'application coupe déjà le bip dans tes écouteurs/AirPods et la vibration sur ton iPhone.
       </p>
-      <div style="padding-left:16px; border-left:2px solid var(--volt); color:#fff;">
-        <strong>1.</strong> Ouvre l'app <strong>Raccourcis</strong> sur ton iPhone.<br/><br/>
-        <strong>2.</strong> Crée un raccourci nommé exactement :<br/>
-        <span style="color:var(--volt); font-weight:900;">IronPulse Timer</span><br/><br/>
-        <strong>3.</strong> Ajoute l'action <strong>Démarrer le minuteur</strong>.<br/><br/>
-        <strong>4.</strong> Maintiens le doigt sur la durée → choisis <strong>Entrée du raccourci</strong> en <strong>Secondes</strong>.
+      <div style="padding-left:16px; border-left:2px solid var(--volt); color:#fff; margin-bottom:16px;">
+        <strong>Pour n'avoir que la vibration sur ta montre :</strong><br/><br/>
+        <strong>1.</strong> Laisse ton iPhone en <strong>Mode Silencieux</strong>.<br/><br/>
+        <strong>2.</strong> Si Siri lit ou fait sonner les alertes dans tes AirPods : va dans <em>Réglages iOS → Notifications → Annoncer les notifications</em> et désactive <strong>Écouteurs</strong>.<br/><br/>
+        <strong>3.</strong> Pour lancer le vrai minuteur Apple Watch automatiquement : ouvre <strong>Raccourcis</strong> sur l'iPhone, crée un raccourci nommé <span style="color:var(--volt); font-weight:900;">IronPulse Timer</span> avec l'action <strong>Démarrer le minuteur</strong> réglée sur <strong>Entrée du raccourci (Secondes)</strong>, puis active <em>Relais Minuteur Natif Watch</em>.
       </div>
     </div>
   `);
@@ -1744,6 +2032,16 @@ function setupEvents() {
       const raw = btn.dataset.idx;
       state.ui.focusedExoIdx = raw === 'all' ? 'all' : parseInt(raw);
       renderActiveWorkout(document.getElementById('workout-container'), true);
+    } else if (action === 'move-live-exo-up') {
+      moveLiveExercise(parseInt(btn.dataset.exoIdx), -1);
+      showToast('Exercice déplacé ↑');
+    } else if (action === 'move-live-exo-down') {
+      moveLiveExercise(parseInt(btn.dataset.exoIdx), 1);
+      showToast('Exercice déplacé ↓');
+    } else if (action === 'toggle-live-biset') {
+      toggleLiveBiset(parseInt(btn.dataset.exoIdx));
+    } else if (action === 'open-reorder-live-modal') {
+      openReorderLiveWorkoutModal();
     } else if (action === 'toggle-live-unilateral') {
       const idx = parseInt(btn.dataset.exoIdx);
       const wExo = state.activeWorkout.exercises[idx];
@@ -1798,11 +2096,28 @@ function setupEvents() {
       const s = wExo.sets[setIdx];
       s.done = !s.done;
 
+      let scrollToPartnerIdx = null;
+
       if (s.done) {
         const pr = checkSetPR(wExo.exerciseId, s, wExo.unilateral);
         s.prBadge = pr;
         if (pr) showToast(`Nouveau Record (${pr}) !`, true);
-        if (state.settings.autoStartTimer) {
+
+        const bisetMap = getBisetMap(state.activeWorkout.exercises);
+        const bInfo = bisetMap.get(exoIdx);
+
+        if (bInfo && bInfo.role === 'first') {
+          const partnerWExo = state.activeWorkout.exercises[bInfo.partnerIdx];
+          const partnerSet = partnerWExo && (partnerWExo.sets[setIdx] || partnerWExo.sets.find((ps) => !ps.done));
+          if (partnerSet && !partnerSet.done) {
+            const partnerExoObj = getExercise(partnerWExo.exerciseId);
+            showToast(`⚡ Biset ${bInfo.code} validé → Enchaîne sur ${partnerExoObj ? partnerExoObj.name : bInfo.partnerCode} !`, true);
+            scrollToPartnerIdx = bInfo.partnerIdx;
+          } else if (state.settings.autoStartTimer) {
+            const exoObj = getExercise(wExo.exerciseId);
+            startRestTimer(wExo.restSeconds || DEFAULT_REST_SEC, exoObj ? exoObj.name : 'Exercice');
+          }
+        } else if (state.settings.autoStartTimer) {
           const exoObj = getExercise(wExo.exerciseId);
           startRestTimer(wExo.restSeconds || DEFAULT_REST_SEC, exoObj ? exoObj.name : 'Exercice');
         }
@@ -1812,6 +2127,13 @@ function setupEvents() {
 
       saveState();
       renderWorkoutTab();
+
+      if (scrollToPartnerIdx !== null) {
+        const partnerStage = document.getElementById(`live-exo-stage-${scrollToPartnerIdx}`);
+        if (partnerStage) {
+          partnerStage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
     } else if (action === 'add-live-set') {
       const exoIdx = parseInt(btn.dataset.exoIdx);
       const wExo = state.activeWorkout.exercises[exoIdx];
@@ -1851,6 +2173,8 @@ function setupEvents() {
       openSwapOrAddExoModal(null);
     } else if (action === 'remove-live-exo') {
       state.activeWorkout.exercises.splice(parseInt(btn.dataset.exoIdx), 1);
+      const len = state.activeWorkout.exercises.length;
+      if (len > 0) state.activeWorkout.exercises[len - 1].bisetWithNext = false;
       saveState();
       renderWorkoutTab();
     } else if (action === 'open-exo-stats-quick') {
@@ -2016,6 +2340,7 @@ function applyLiveExerciseSelection(exerciseId, replaceIdx) {
     targetReps: '8-10',
     restSeconds: exo.defaultRest || DEFAULT_REST_SEC,
     unilateral: isUni,
+    bisetWithNext: replaceIdx !== null ? !!state.activeWorkout.exercises[replaceIdx]?.bisetWithNext : false,
     sets: newSets
   };
 
@@ -2214,7 +2539,7 @@ async function initApp() {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=9').then((reg) => {
       reg.update();
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update();
