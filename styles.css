@@ -646,6 +646,11 @@ input::-webkit-inner-spin-button {
   align-items: baseline;
   gap: 14px;
   flex: 1;
+  min-width: 0;
+}
+
+.dial-group.uni {
+  gap: 8px;
 }
 
 .dial-field {
@@ -656,7 +661,22 @@ input::-webkit-inner-spin-button {
   padding-bottom: 3px;
   transition: border-color 0.18s ease;
   flex: 1;
+  min-width: 0;
   max-width: 115px;
+}
+
+.dial-group.uni .dial-field {
+  max-width: 92px;
+  gap: 3px;
+}
+
+.dial-group.uni .dial-field.dial-weight {
+  flex: 1.25;
+}
+
+.dial-group.uni .dial-field.dial-left,
+.dial-group.uni .dial-field.dial-right {
+  flex: 0.95;
 }
 
 .dial-field:focus-within {
@@ -673,12 +693,17 @@ input::-webkit-inner-spin-button {
 
 .dial-input {
   width: 100%;
+  min-width: 0;
   font-size: 1.9rem;
   font-weight: 900;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: #fff;
   line-height: 1;
+}
+
+.dial-group.uni .dial-input {
+  font-size: 1.45rem;
 }
 
 .dial-input::placeholder {
@@ -694,6 +719,10 @@ input::-webkit-inner-spin-button {
   flex-shrink: 0;
 }
 
+.dial-group.uni .dial-unit {
+  font-size: 0.7rem;
+}
+
 .dial-unit.unit-g {
   color: var(--ice);
 }
@@ -706,6 +735,11 @@ input::-webkit-inner-spin-button {
   font-size: 1.1rem;
   font-weight: 300;
   color: var(--text-ghost);
+  flex-shrink: 0;
+}
+
+.dial-group.uni .dial-divider {
+  font-size: 0.95rem;
 }
 
 /* Liquid Glass Check Orb */
@@ -738,6 +772,37 @@ input::-webkit-inner-spin-button {
     0 0 24px var(--volt-glow),
     inset 0 2px 2px rgba(255, 255, 255, 0.75);
   transform: scale(1.04);
+}
+
+.liquid-check-orb.orb-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.liquid-check-orb.orb-sm svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+/* Workout History Editor Specific */
+.edit-wk-set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.edit-wk-set-input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #fff;
+  padding: 2px 0 !important;
+  border-bottom: none !important;
 }
 
 /* ==========================================================================
@@ -780,6 +845,48 @@ input::-webkit-inner-spin-button {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-dim);
+}
+
+.sculpt-metric-sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stat-formula-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 24px 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+.stat-formula-banner .formula-tag {
+  background: var(--volt-soft);
+  color: var(--volt);
+  font-weight: 800;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.stat-formula-banner .formula-text {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.75rem;
+}
+
+.stat-formula-banner .formula-text strong {
+  color: var(--volt);
+  font-weight: 800;
 }
 
 /* Full-Bleed Horizon Chart (Breaks out of screen margins!) */

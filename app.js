@@ -38,7 +38,7 @@ let state = {
   ui: {
     activeTab: 'workout',
     selectedStatExoId: '',
-    statMetric: 'maxWeight',
+    statMetric: 'e1rm',
     quickAddUni: false,
     focusedExoIdx: 0 // Focus Deck index during active workout ('all' or 0..n)
   }
@@ -333,6 +333,82 @@ function getPreviousExercisePerf(exerciseId) {
   return null;
 }
 
+function getExercisePR(exerciseId) {
+  let bestWeight = 0;
+  let bestWeightReps = 0;
+  let bestWeightRepsLeft = 0;
+  let bestWeightRepsRight = 0;
+  let isUni = false;
+  let best1RM = 0;
+  let best1RMDesc = '';
+  let date = null;
+
+  for (const wk of state.history) {
+    for (const ex of wk.exercises || []) {
+      if (ex.exerciseId !== exerciseId) continue;
+      for (const s of ex.sets || []) {
+        if (!s.done || s.tag === 'W') continue;
+        const w = parseFloat(s.weight) || 0;
+        if (w <= 0) continue;
+        if (ex.unilateral) {
+          isUni = true;
+          const rL = parseInt(s.repsLeft) || 0;
+          const rR = parseInt(s.repsRight) || 0;
+          const maxR = Math.max(rL, rR);
+          if (maxR <= 0) continue;
+          const e1rm = maxR === 1 ? w : w * (1 + maxR / 30);
+          if (w > bestWeight || (w === bestWeight && maxR > Math.max(bestWeightRepsLeft, bestWeightRepsRight))) {
+            bestWeight = w;
+            bestWeightRepsLeft = rL;
+            bestWeightRepsRight = rR;
+            date = wk.date;
+          }
+          if (e1rm > best1RM) {
+            best1RM = e1rm;
+            best1RMDesc = `${w}kg (G:${rL}/D:${rR})`;
+          }
+        } else {
+          const r = parseInt(s.reps) || 0;
+          if (r <= 0) continue;
+          const e1rm = r === 1 ? w : w * (1 + r / 30);
+          if (w > bestWeight || (w === bestWeight && r > bestWeightReps)) {
+            bestWeight = w;
+            bestWeightReps = r;
+            date = wk.date;
+          }
+          if (e1rm > best1RM) {
+            best1RM = e1rm;
+            best1RMDesc = `${w}kg × ${r} reps`;
+          }
+        }
+      }
+    }
+  }
+
+  if (bestWeight <= 0) return null;
+
+  const repsStr = isUni
+    ? `G:${bestWeightRepsLeft} / D:${bestWeightRepsRight} reps`
+    : `× ${bestWeightReps} reps`;
+
+  const desc = isUni
+    ? `${bestWeight} kg • G:${bestWeightRepsLeft} / D:${bestWeightRepsRight}`
+    : `${bestWeight} kg × ${bestWeightReps} reps`;
+
+  return {
+    weight: bestWeight,
+    reps: bestWeightReps,
+    repsLeft: bestWeightRepsLeft,
+    repsRight: bestWeightRepsRight,
+    repsStr,
+    isUni,
+    desc,
+    best1RM: Math.round(best1RM * 10) / 10,
+    best1RMDesc,
+    date
+  };
+}
+
 function checkSetPR(exerciseId, setObj, isUnilateral) {
   if (setObj.tag === 'W') return null;
   const weight = parseFloat(setObj.weight) || 0;
@@ -341,9 +417,11 @@ function checkSetPR(exerciseId, setObj, isUnilateral) {
     : parseInt(setObj.reps) || 0;
 
   if (weight <= 0 || reps <= 0) return null;
-  const current1RM = weight * (1 + reps / 30);
+  const current1RM = reps === 1 ? weight : weight * (1 + reps / 30);
 
   let maxWeightEver = 0;
+  let maxRepsAtMaxWeight = 0;
+  let maxRepsAtThisWeight = 0;
   let max1RMEver = 0;
   let hadPreviousHistory = false;
 
@@ -358,8 +436,16 @@ function checkSetPR(exerciseId, setObj, isUnilateral) {
           : parseInt(s.reps) || 0;
         if (w > 0 && r > 0) {
           hadPreviousHistory = true;
-          if (w > maxWeightEver) maxWeightEver = w;
-          const e1rm = w * (1 + r / 30);
+          if (w > maxWeightEver) {
+            maxWeightEver = w;
+            maxRepsAtMaxWeight = r;
+          } else if (w === maxWeightEver && r > maxRepsAtMaxWeight) {
+            maxRepsAtMaxWeight = r;
+          }
+          if (w === weight && r > maxRepsAtThisWeight) {
+            maxRepsAtThisWeight = r;
+          }
+          const e1rm = r === 1 ? w : w * (1 + r / 30);
           if (e1rm > max1RMEver) max1RMEver = e1rm;
         }
       }
@@ -367,8 +453,28 @@ function checkSetPR(exerciseId, setObj, isUnilateral) {
   }
 
   if (!hadPreviousHistory) return null;
-  if (weight > maxWeightEver) return 'PR Poids';
-  if (current1RM > max1RMEver + 0.2) return 'PR 1RM';
+
+  const desc = isUnilateral
+    ? `${weight}kg (G:${setObj.repsLeft || reps}/D:${setObj.repsRight || reps})`
+    : `${weight}kg × ${reps}`;
+
+  // 1. Charge plus lourde que le record absolu précédent
+  if (weight > maxWeightEver) {
+    return `${desc}`;
+  }
+  // 2. Même charge max, mais plus de répétitions
+  if (weight === maxWeightEver && reps > maxRepsAtMaxWeight) {
+    return `${desc}`;
+  }
+  // 3. Record de répétitions pour cette charge précise
+  if (maxRepsAtThisWeight > 0 && reps > maxRepsAtThisWeight) {
+    return `${desc}`;
+  }
+  // 4. Record de 1RM estimé (nouvelle force record)
+  if (current1RM > max1RMEver + 0.3) {
+    return `${desc}`;
+  }
+
   return null;
 }
 
@@ -684,25 +790,30 @@ function renderWorkoutLauncher(container) {
         `;
       }).join('');
 
-  const recentHistory = [...state.history]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 6);
+  const allHistorySorted = [...state.history]
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const recentHistory = allHistorySorted.slice(0, 6);
 
   const historyHtml = recentHistory.length === 0
     ? `<div style="padding:18px 0; color:var(--text-ghost); font-size:0.86rem;">Aucune séance archivée pour le moment.</div>`
     : recentHistory.map((wk) => {
         const totalSets = (wk.exercises || []).reduce((acc, ex) => acc + (ex.sets || []).filter((s) => s.done).length, 0);
         return `
-          <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center;">
+          <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div style="cursor:pointer; flex:1;" data-action="view-history-wk" data-id="${wk.id}">
               <div style="font-weight:800; font-size:1.05rem; letter-spacing:-0.02em;">${escapeHtml(wk.name)}</div>
               <div style="font-size:0.78rem; color:var(--text-dim); margin-top:3px;">
                 ${formatDateShort(wk.date)} — ${(wk.exercises || []).length} exos • ${totalSets} séries validées
               </div>
             </div>
-            <button type="button" class="circle-icon-btn" data-action="delete-history-wk" data-id="${wk.id}" title="Supprimer">
-              ${ICONS.trash}
-            </button>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="circle-icon-btn" data-action="edit-history-wk" data-id="${wk.id}" title="Modifier la séance">
+                ${ICONS.edit}
+              </button>
+              <button type="button" class="circle-icon-btn" data-action="delete-history-wk" data-id="${wk.id}" title="Supprimer">
+                ${ICONS.trash}
+              </button>
+            </div>
           </div>
         `;
       }).join('');
@@ -733,10 +844,16 @@ function renderWorkoutLauncher(container) {
 
     <div class="runway-header" style="margin-top:36px;">
       <span class="runway-title">Journal récent</span>
+      ${allHistorySorted.length > 6 ? `<button type="button" class="btn btn-ghost btn-sm" data-action="view-all-history">Voir tout (${allHistorySorted.length})</button>` : ''}
     </div>
     <div>
       ${historyHtml}
     </div>
+    ${allHistorySorted.length > 6 ? `
+      <button type="button" class="btn btn-ghost btn-block" data-action="view-all-history" style="margin-top:14px;">
+        Voir tout l'historique (${allHistorySorted.length} séances)
+      </button>
+    ` : ''}
   `;
 }
 
@@ -799,6 +916,7 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
     };
     const isUni = !!wExo.unilateral;
     const prevPerf = getPreviousExercisePerf(wExo.exerciseId);
+    const exoPR = getExercisePR(wExo.exerciseId);
     const bInfo = bisetMap.get(exoIdx);
 
     let normalCounter = 0;
@@ -835,7 +953,7 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
             <div class="spine-meta-line">
               <button type="button" class="ghost-prev-tap" data-action="copy-prev-set" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
                 ${ICONS.history}
-                <span>${s.prBadge ? `🏆 <strong>${s.prBadge}</strong>` : prevText}</span>
+                <span>${s.prBadge ? `🏆 <strong>PR : ${s.prBadge}</strong>` : prevText}</span>
               </button>
               <button type="button" class="rir-whisper-btn ${s.rir ? 'has-rir' : ''}" data-action="cycle-rir" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}">
                 ${rirDisplay}
@@ -843,10 +961,10 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
             </div>
 
             <div class="dial-strip">
-              <div class="dial-group">
-                <label class="dial-field">
+              <div class="dial-group ${isUni ? 'uni' : ''}">
+                <label class="dial-field dial-weight">
                   <input type="number" step="0.5" inputmode="decimal" class="dial-input" placeholder="0" value="${escapeAttr(s.weight)}" data-input="weight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" />
-                  <span class="dial-unit">${isUni ? 'kg/côté' : 'kg'}</span>
+                  <span class="dial-unit">kg</span>
                 </label>
 
                 <span class="dial-divider">×</span>
@@ -920,6 +1038,11 @@ function renderActiveWorkout(container, scrollActivePillIntoView = false) {
               <button type="button" class="glass-tag ${isUni ? 'uni' : 'bi'}" data-action="toggle-live-unilateral" data-exo-idx="${exoIdx}">
                 ${isUni ? '🦿 Unilatéral G / D' : '🏋️ Bilatéral'}
               </button>
+              ${exoPR ? `
+                <button type="button" class="glass-tag" style="background:rgba(212,255,0,0.12); color:var(--volt); border:1px solid rgba(212,255,0,0.25); font-weight:800;" data-action="open-exo-stats-quick" data-exo-id="${exo.id}" title="Record Personnel (clique pour voir les courbes)">
+                  🏆 PR : ${exoPR.desc}
+                </button>
+              ` : ''}
               <span class="glass-tag">Cible ${escapeHtml(wExo.targetReps)}</span>
               <button type="button" class="glass-tag" data-action="edit-live-rest" data-exo-idx="${exoIdx}">
                 ⏱️ Repos ${formatDuration(wExo.restSeconds || DEFAULT_REST_SEC)}
@@ -1141,14 +1264,16 @@ function getExerciseStatsHistory(exerciseId) {
     if (workingSets.length === 0) continue;
 
     let maxWeight = 0;
+    let maxWeightDesc = '';
     let best1RM = 0;
+    let best1RMDesc = '';
     let totalVolume = 0;
     let totalRepsLeft = 0;
     let totalRepsRight = 0;
-    let bestSetDesc = '';
 
     workingSets.forEach((s) => {
       const w = parseFloat(s.weight) || 0;
+      if (w <= 0) return;
       if (found.unilateral) {
         const rL = parseInt(s.repsLeft) || 0;
         const rR = parseInt(s.repsRight) || 0;
@@ -1156,34 +1281,52 @@ function getExerciseStatsHistory(exerciseId) {
         totalRepsLeft += rL;
         totalRepsRight += rR;
         totalVolume += w * (rL + rR);
-        if (w >= maxWeight) {
+
+        if (w > maxWeight || (w === maxWeight && maxR > 0)) {
           maxWeight = w;
-          bestSetDesc = `${w}kg (G:${rL}/D:${rR})`;
+          maxWeightDesc = `${w}kg (G:${rL}/D:${rR})`;
         }
-        const e1rm = w * (1 + maxR / 30);
-        if (e1rm > best1RM) best1RM = e1rm;
+
+        const e1rm = maxR === 1 ? w : w * (1 + maxR / 30);
+        if (e1rm > best1RM) {
+          best1RM = e1rm;
+          best1RMDesc = `${w}kg (G:${rL}/D:${rR})`;
+        }
       } else {
         const r = parseInt(s.reps) || 0;
+        if (r <= 0) return;
         totalVolume += w * r;
-        if (w >= maxWeight) {
+
+        if (w > maxWeight) {
           maxWeight = w;
-          bestSetDesc = `${w}kg × ${r}`;
+          maxWeightDesc = `${w}kg × ${r}`;
+        } else if (w === maxWeight && (!maxWeightDesc || r > (parseInt(maxWeightDesc.match(/× (\d+)/)?.[1]) || 0))) {
+          maxWeightDesc = `${w}kg × ${r}`;
         }
-        const e1rm = w * (1 + r / 30);
-        if (e1rm > best1RM) best1RM = e1rm;
+
+        const e1rm = r === 1 ? w : w * (1 + r / 30);
+        if (e1rm > best1RM) {
+          best1RM = e1rm;
+          best1RMDesc = `${w}kg × ${r}`;
+        }
       }
     });
 
+    if (maxWeight <= 0) continue;
+
     sessions.push({
+      workoutId: wk.id,
       date: wk.date,
       workoutName: wk.name,
       unilateral: found.unilateral,
       maxWeight: Math.round(maxWeight * 10) / 10,
+      maxWeightDesc: maxWeightDesc || `${maxWeight}kg`,
       best1RM: Math.round(best1RM * 10) / 10,
+      best1RMDesc: best1RMDesc || maxWeightDesc || `${maxWeight}kg`,
       totalVolume: Math.round(totalVolume),
       totalRepsLeft,
       totalRepsRight,
-      bestSetDesc,
+      bestSetDesc: best1RMDesc || maxWeightDesc || `${maxWeight}kg`,
       sets: workingSets
     });
   }
@@ -1210,8 +1353,9 @@ function renderStatsTab() {
   `).join('');
 
   const sessions = getExerciseStatsHistory(currentExo.id);
-  const allTimeMaxWeight = sessions.reduce((m, s) => Math.max(m, s.maxWeight), 0);
-  const allTimeBest1RM = sessions.reduce((m, s) => Math.max(m, s.best1RM), 0);
+  const exoPR = getExercisePR(currentExo.id);
+  const allTimeMaxWeight = exoPR ? exoPR.weight : 0;
+  const allTimeBest1RM = exoPR ? exoPR.best1RM : 0;
   const allTimeMaxVol = sessions.reduce((m, s) => Math.max(m, s.totalVolume), 0);
 
   let sumLeft = 0;
@@ -1224,7 +1368,7 @@ function renderStatsTab() {
   const leftPct = totalUniReps > 0 ? Math.round((sumLeft / totalUniReps) * 100) : 50;
   const rightPct = totalUniReps > 0 ? 100 - leftPct : 50;
 
-  const metric = state.ui.statMetric;
+  const metric = state.ui.statMetric || 'e1rm';
 
   const sessionRowsHtml = [...sessions].reverse().map((s) => {
     const setsText = s.sets.map((st) => {
@@ -1232,13 +1376,23 @@ function renderStatsTab() {
       return `${st.weight}kg × ${st.reps}`;
     }).join('  •  ');
 
+    const isAllTimePR = exoPR && s.maxWeight === exoPR.weight;
+
     return `
-      <div style="padding:16px 0; border-bottom:1px solid var(--hairline);">
-        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-          <span style="font-weight:900; font-size:0.95rem;">${formatDateShort(s.date)}</span>
-          <span style="font-size:0.8rem; color:var(--volt); font-weight:800;">Max ${s.bestSetDesc} • 1RM ${s.best1RM}kg</span>
+      <div style="padding:16px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="cursor:pointer; flex:1;" data-action="view-history-wk" data-id="${s.workoutId}">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:900; font-size:0.95rem;">${formatDateShort(s.date)}</span>
+              ${isAllTimePR ? `<span class="glass-tag" style="background:rgba(212,255,0,0.12); color:var(--volt); padding:1px 6px; font-size:0.68rem; font-weight:800;">🏆 PR Charge</span>` : ''}
+            </div>
+            <span style="font-size:0.8rem; color:var(--volt); font-weight:800;">Meilleure série : ${s.best1RMDesc} • 1RM ${s.best1RM}kg</span>
+          </div>
+          <div style="font-size:0.82rem; color:var(--text-dim);">${setsText}</div>
         </div>
-        <div style="font-size:0.82rem; color:var(--text-dim);">${setsText}</div>
+        <button type="button" class="circle-icon-btn" data-action="edit-history-wk" data-id="${s.workoutId}" title="Modifier la séance">
+          ${ICONS.edit}
+        </button>
       </div>
     `;
   }).join('');
@@ -1254,15 +1408,18 @@ function renderStatsTab() {
     <div class="sculptural-metrics-strip">
       <div class="sculpt-metric">
         <span class="sculpt-metric-val" style="color:var(--volt);">${allTimeMaxWeight}<small>kg</small></span>
-        <span class="sculpt-metric-lbl">Record Poids</span>
+        <span class="sculpt-metric-lbl">🏆 Record PR</span>
+        <span class="sculpt-metric-sub">${exoPR ? exoPR.repsStr : 'Aucun'}</span>
       </div>
       <div class="sculpt-metric">
         <span class="sculpt-metric-val">${allTimeBest1RM}<small>kg</small></span>
-        <span class="sculpt-metric-lbl">1RM Estimé</span>
+        <span class="sculpt-metric-lbl">1RM Estimé Max</span>
+        <span class="sculpt-metric-sub">${exoPR && exoPR.best1RMDesc ? exoPR.best1RMDesc : 'Formule Epley'}</span>
       </div>
       <div class="sculpt-metric">
         <span class="sculpt-metric-val">${allTimeMaxVol}<small>kg</small></span>
-        <span class="sculpt-metric-lbl">Volume Max</span>
+        <span class="sculpt-metric-lbl">Volume Record</span>
+        <span class="sculpt-metric-sub">Sur 1 séance</span>
       </div>
     </div>
 
@@ -1282,12 +1439,29 @@ function renderStatsTab() {
     <!-- Full-Bleed Edge-to-Edge Horizon Wave -->
     <div class="full-bleed-chart-stage">
       <div class="chart-pills-bar">
+        <button type="button" class="deck-pill ${metric === 'e1rm' ? 'active' : ''}" data-action="set-stat-metric" data-metric="e1rm">1RM Estimé (Poids + Reps)</button>
         <button type="button" class="deck-pill ${metric === 'maxWeight' ? 'active' : ''}" data-action="set-stat-metric" data-metric="maxWeight">Charge Max</button>
-        <button type="button" class="deck-pill ${metric === 'e1rm' ? 'active' : ''}" data-action="set-stat-metric" data-metric="e1rm">1RM Estimé</button>
         <button type="button" class="deck-pill ${metric === 'volume' ? 'active' : ''}" data-action="set-stat-metric" data-metric="volume">Volume</button>
         ${currentExo.unilateral ? `<button type="button" class="deck-pill ${metric === 'asymmetry' ? 'active' : ''}" data-action="set-stat-metric" data-metric="asymmetry">Gauche vs Droite</button>` : ''}
       </div>
-      <div style="height:220px; width:100%;">
+
+      <div class="stat-formula-banner">
+        ${metric === 'e1rm' ? `
+          <span class="formula-tag">Formule Epley</span>
+          <span class="formula-text"><strong>1RM = Charge × (1 + Reps / 30)</strong> • Combine charge et répétitions pour mesurer ton gain de force réel.</span>
+        ` : metric === 'maxWeight' ? `
+          <span class="formula-tag">Charge Max</span>
+          <span class="formula-text">Poids le plus lourd soulevé lors de la séance (avec son nombre de reps).</span>
+        ` : metric === 'volume' ? `
+          <span class="formula-tag">Volume Total</span>
+          <span class="formula-text">Somme des kg soulevés sur la séance (Poids × Reps totales).</span>
+        ` : `
+          <span class="formula-tag">Équilibre G/D</span>
+          <span class="formula-text">Comparaison des répétitions totales réalisées entre côté Gauche et Côté Droit.</span>
+        `}
+      </div>
+
+      <div style="height:230px; width:100%;">
         ${buildSmoothSvgChart(sessions, metric)}
       </div>
     </div>
@@ -1326,11 +1500,11 @@ function buildSmoothSvgChart(sessions, metric) {
   }
 
   const w = 520;
-  const h = 210;
+  const h = 230;
   const padL = 36;
   const padR = 36;
-  const padT = 32;
-  const padB = 32;
+  const padT = 36;
+  const padB = 34;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
@@ -1380,17 +1554,37 @@ function buildSmoothSvgChart(sessions, metric) {
   const getX = (i) => sessions.length === 1 ? padL + plotW / 2 : padL + (i / (sessions.length - 1)) * plotW;
   const getY = (v) => padT + plotH - ((v - low) / (high - low || 1)) * plotH;
 
-  const pts = values.map((v, i) => ({ x: getX(i), y: getY(v), v }));
+  const pts = values.map((v, i) => {
+    let subDesc = '';
+    if (metric === 'e1rm') {
+      subDesc = sessions[i].best1RMDesc || '';
+    } else if (metric === 'maxWeight') {
+      subDesc = sessions[i].maxWeightDesc || '';
+    } else if (metric === 'volume') {
+      subDesc = `${sessions[i].sets.length} séries`;
+    }
+    return { x: getX(i), y: getY(v), v, subDesc };
+  });
+
   const curvePath = buildSmoothCurvePath(pts);
   const areaPath = pts.length > 1
     ? `${curvePath} L ${pts[pts.length - 1].x} ${padT + plotH} L ${pts[0].x} ${padT + plotH} Z`
     : '';
 
-  const nodes = pts.map((p, i) => `
-    <circle cx="${p.x}" cy="${p.y}" r="6" fill="#d4ff00" stroke="#050507" stroke-width="2.5" />
-    <text x="${p.x}" y="${p.y - 12}" fill="#ffffff" font-size="12" font-weight="900" text-anchor="middle">${p.v}</text>
-    <text x="${p.x}" y="${h - 8}" fill="rgba(255,255,255,0.4)" font-size="11" font-weight="700" text-anchor="middle">${formatDateShort(sessions[i].date)}</text>
-  `).join('');
+  const nodes = pts.map((p, i) => {
+    const showDate = pts.length <= 8 || i === 0 || i === pts.length - 1 || i % 2 === 0;
+    const labelY = p.y < 28 ? p.y + 24 : p.y - 12;
+    const subY = p.y < 28 ? p.y + 37 : Math.min(h - 20, p.y + 16);
+
+    return `
+      <g class="chart-point">
+        <circle cx="${p.x}" cy="${p.y}" r="6.5" fill="#d4ff00" stroke="#050507" stroke-width="2.5" />
+        <text x="${p.x}" y="${labelY}" fill="#ffffff" font-size="12" font-weight="900" text-anchor="middle">${p.v}${metric !== 'volume' ? 'kg' : ''}</text>
+        ${p.subDesc ? `<text x="${p.x}" y="${subY}" fill="#d4ff00" font-size="9" font-weight="800" text-anchor="middle" opacity="0.95">${escapeHtml(p.subDesc)}</text>` : ''}
+        ${showDate ? `<text x="${p.x}" y="${h - 6}" fill="rgba(255,255,255,0.45)" font-size="10" font-weight="700" text-anchor="middle">${formatDateShort(sessions[i].date)}</text>` : ''}
+      </g>
+    `;
+  }).join('');
 
   return `
     <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%">
@@ -2048,6 +2242,18 @@ function setupEvents() {
       wExo.unilateral = !wExo.unilateral;
       const libExo = getExercise(wExo.exerciseId);
       if (libExo) libExo.unilateral = wExo.unilateral;
+      wExo.sets.forEach((s) => {
+        if (wExo.unilateral) {
+          if (!s.repsLeft && !s.repsRight && s.reps) {
+            s.repsLeft = s.reps;
+            s.repsRight = s.reps;
+          }
+        } else {
+          if (!s.reps && (s.repsLeft || s.repsRight)) {
+            s.reps = s.repsLeft || s.repsRight;
+          }
+        }
+      });
       saveState();
       renderWorkoutTab();
     } else if (action === 'cycle-set-tag') {
@@ -2220,6 +2426,10 @@ function setupEvents() {
       }
     } else if (action === 'view-history-wk') {
       openHistoryDetailModal(btn.dataset.id);
+    } else if (action === 'edit-history-wk') {
+      openEditHistoryModal(btn.dataset.id);
+    } else if (action === 'view-all-history') {
+      openAllHistoryModal();
     } else if (action === 'request-notif-perm') {
       if ('Notification' in window) {
         Notification.requestPermission().then(() => renderSettingsTab());
@@ -2395,28 +2605,527 @@ function finishActiveWorkout() {
   showToast('Séance enregistrée !', true);
 }
 
+function toDatetimeLocalValue(dateStr) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  const YYYY = d.getFullYear();
+  const MM = pad(d.getMonth() + 1);
+  const DD = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+}
+
 function openHistoryDetailModal(wkId) {
   const wk = state.history.find((h) => h.id === wkId);
   if (!wk) return;
 
-  const html = (wk.exercises || []).map((ex) => {
-    const exoObj = getExercise(ex.exerciseId);
-    const setsLines = (ex.sets || []).filter((s) => s.done).map((s, i) => {
-      const perf = ex.unilateral
-        ? `${s.weight} kg/côté • G: ${s.repsLeft} | D: ${s.repsRight}`
-        : `${s.weight} kg × ${s.reps} reps`;
-      return `<div style="font-size:0.86rem; padding:4px 0; color:var(--text-dim);">0${i + 1} — <strong style="color:#fff;">${perf}</strong></div>`;
-    }).join('');
+  const dateFormatted = new Date(wk.date).toLocaleDateString('fr-FR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
 
-    return `
-      <div style="padding:14px 0; border-bottom:1px solid var(--hairline);">
-        <div style="font-weight:900; font-size:1.05rem; margin-bottom:6px;">${escapeHtml(exoObj ? exoObj.name : 'Exercice')}</div>
-        ${setsLines}
+  const durationStr = wk.durationSec ? formatDuration(wk.durationSec) : null;
+
+  const html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--hairline); flex-wrap:wrap; gap:8px;">
+      <div>
+        <div style="font-size:0.84rem; color:var(--text-dim); text-transform:capitalize;">${dateFormatted}</div>
+        ${durationStr ? `<div style="font-size:0.75rem; color:var(--volt); font-weight:700; margin-top:2px;">⏱️ Durée : ${durationStr}</div>` : ''}
       </div>
-    `;
-  }).join('');
+      <button type="button" class="btn btn-primary btn-sm" id="detail-edit-wk-btn" style="gap:6px;">
+        ${ICONS.edit} Modifier
+      </button>
+    </div>
+
+    ${(wk.exercises || []).map((ex) => {
+      const exoObj = getExercise(ex.exerciseId);
+      const doneSets = (ex.sets || []).filter((s) => s.done);
+      const setsLines = doneSets.length === 0
+        ? `<div style="font-size:0.82rem; color:var(--text-ghost); padding:4px 0;">Aucune série validée</div>`
+        : doneSets.map((s, i) => {
+            const perf = ex.unilateral
+              ? `${s.weight || 0} kg • G: ${s.repsLeft || 0} / D: ${s.repsRight || 0}`
+              : `${s.weight || 0} kg × ${s.reps || 0} reps`;
+            const tagStr = ['W', 'D', 'F'].includes(s.tag) ? `[${s.tag}] ` : '';
+            return `
+              <div style="font-size:0.88rem; padding:4px 0; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center;">
+                <span>${tagStr}0${i + 1} — <strong style="color:#fff;">${perf}</strong></span>
+                ${s.rir ? `<span style="font-size:0.72rem; color:var(--ice); font-weight:800; background:var(--ice-soft); padding:2px 7px; border-radius:999px;">RIR ${s.rir}</span>` : ''}
+              </div>
+            `;
+          }).join('');
+
+      return `
+        <div style="padding:14px 0; border-bottom:1px solid var(--hairline);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="font-weight:900; font-size:1.05rem;">${escapeHtml(exoObj ? exoObj.name : 'Exercice')}</div>
+            <span class="glass-tag ${ex.unilateral ? 'uni' : 'bi'}" style="font-size:0.68rem; padding:2px 8px;">
+              ${ex.unilateral ? '🦿 Unilatéral G/D' : '🏋️ Bilatéral'}
+            </span>
+          </div>
+          ${setsLines}
+        </div>
+      `;
+    }).join('')}
+
+    <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+      <button type="button" class="btn btn-secondary btn-block" id="detail-edit-wk-btn-full">
+        ✏️ Modifier la séance
+      </button>
+      <button type="button" class="btn btn-ghost btn-block" id="detail-delete-wk-btn" style="color:#ef4444;">
+        Supprimer cette séance
+      </button>
+    </div>
+  `;
 
   openModal(`${wk.name}`, html);
+
+  const editHandler = () => {
+    openEditHistoryModal(wkId);
+  };
+  document.getElementById('detail-edit-wk-btn')?.addEventListener('click', editHandler);
+  document.getElementById('detail-edit-wk-btn-full')?.addEventListener('click', editHandler);
+
+  document.getElementById('detail-delete-wk-btn')?.addEventListener('click', () => {
+    if (confirm('Supprimer cette séance de l’historique ?')) {
+      state.history = state.history.filter((h) => h.id !== wkId);
+      saveState(true);
+      renderAll();
+      closeModal();
+      showToast('Séance supprimée');
+    }
+  });
+}
+
+function openEditHistoryModal(wkId) {
+  const wk = state.history.find((h) => h.id === wkId);
+  if (!wk) return;
+
+  // Make deep clone of the workout so user edits are buffered
+  let draft = JSON.parse(JSON.stringify(wk));
+  if (!draft.name) draft.name = 'Séance';
+  if (!draft.date) draft.date = new Date().toISOString();
+  if (!Array.isArray(draft.exercises)) draft.exercises = [];
+
+  // Normalize exercises
+  draft.exercises = draft.exercises.map((ex) => {
+    const exoObj = getExercise(ex.exerciseId);
+    return {
+      id: ex.id || uid('wexo'),
+      exerciseId: ex.exerciseId || '',
+      exoName: ex.exoName || (exoObj ? exoObj.name : 'Exercice'),
+      unilateral: ex.unilateral !== undefined ? !!ex.unilateral : (exoObj ? !!exoObj.unilateral : false),
+      targetReps: ex.targetReps || '8-12',
+      restSeconds: ex.restSeconds || DEFAULT_REST_SEC,
+      bisetWithNext: !!ex.bisetWithNext,
+      sets: (ex.sets || []).map((s, idx) => ({
+        id: s.id || uid('set'),
+        tag: s.tag || String(idx + 1),
+        weight: s.weight !== undefined && s.weight !== null ? String(s.weight) : '',
+        reps: s.reps !== undefined && s.reps !== null ? String(s.reps) : '',
+        repsLeft: s.repsLeft !== undefined && s.repsLeft !== null ? String(s.repsLeft) : '',
+        repsRight: s.repsRight !== undefined && s.repsRight !== null ? String(s.repsRight) : '',
+        rir: s.rir || '',
+        done: s.done !== false,
+        prBadge: s.prBadge || null
+      }))
+    };
+  });
+
+  function renderEditModal() {
+    const datalistOptions = state.exercises.map(
+      (ex) => `<option value="${escapeAttr(ex.name)}"></option>`
+    ).join('');
+
+    const exosHtml = draft.exercises.map((ex, exoIdx) => {
+      const setsHtml = ex.sets.map((s, setIdx) => {
+        const tagClass = ['W', 'D', 'F'].includes(s.tag) ? `tag-${s.tag}` : '';
+        return `
+          <div class="edit-wk-set-row" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <button type="button" class="spine-node-btn ${tagClass} edit-wk-cycle-tag" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" style="width:28px; height:28px; font-size:0.72rem; flex-shrink:0;" title="Normal / W / D / F">
+              ${s.tag}
+            </button>
+
+            <!-- Poids -->
+            <label style="display:flex; align-items:baseline; gap:3px; flex:1.2; min-width:0; border-bottom:1.5px solid rgba(255,255,255,0.14); padding-bottom:2px;">
+              <input type="number" step="0.5" inputmode="decimal" class="open-input-line edit-wk-set-input" data-field="weight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" value="${escapeAttr(s.weight)}" placeholder="0" style="width:100%; min-width:0; text-align:center; font-weight:800; font-size:1.15rem; color:#fff;" />
+              <span style="font-size:0.7rem; color:var(--text-dim); font-weight:700; flex-shrink:0;">kg</span>
+            </label>
+
+            <span style="color:var(--text-ghost); font-size:0.9rem; flex-shrink:0;">×</span>
+
+            <!-- Répétitions -->
+            ${ex.unilateral ? `
+              <label style="display:flex; align-items:baseline; gap:2px; flex:1; min-width:0; border-bottom:1.5px solid rgba(56,189,248,0.3); padding-bottom:2px;">
+                <input type="number" inputmode="numeric" class="open-input-line edit-wk-set-input" data-field="repsLeft" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" value="${escapeAttr(s.repsLeft)}" placeholder="0" style="width:100%; min-width:0; text-align:center; font-weight:800; font-size:1.15rem; color:#fff;" />
+                <span style="font-size:0.7rem; color:var(--ice); font-weight:800; flex-shrink:0;">G</span>
+              </label>
+              <label style="display:flex; align-items:baseline; gap:2px; flex:1; min-width:0; border-bottom:1.5px solid rgba(232,121,249,0.3); padding-bottom:2px;">
+                <input type="number" inputmode="numeric" class="open-input-line edit-wk-set-input" data-field="repsRight" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" value="${escapeAttr(s.repsRight)}" placeholder="0" style="width:100%; min-width:0; text-align:center; font-weight:800; font-size:1.15rem; color:#fff;" />
+                <span style="font-size:0.7rem; color:var(--orchid); font-weight:800; flex-shrink:0;">D</span>
+              </label>
+            ` : `
+              <label style="display:flex; align-items:baseline; gap:3px; flex:1.2; min-width:0; border-bottom:1.5px solid rgba(255,255,255,0.14); padding-bottom:2px;">
+                <input type="number" inputmode="numeric" class="open-input-line edit-wk-set-input" data-field="reps" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" value="${escapeAttr(s.reps)}" placeholder="0" style="width:100%; min-width:0; text-align:center; font-weight:800; font-size:1.15rem; color:#fff;" />
+                <span style="font-size:0.7rem; color:var(--text-dim); font-weight:700; flex-shrink:0;">reps</span>
+              </label>
+            `}
+
+            <!-- Validée -->
+            <button type="button" class="liquid-check-orb orb-sm edit-wk-toggle-done ${s.done ? 'checked' : ''}" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" style="width:30px; height:30px; flex-shrink:0;" title="${s.done ? 'Série validée' : 'Non validée'}">
+              ${ICONS.check}
+            </button>
+
+            <!-- Supprimer série -->
+            <button type="button" class="circle-icon-btn edit-wk-remove-set" data-exo-idx="${exoIdx}" data-set-idx="${setIdx}" style="width:26px; height:26px; flex-shrink:0; opacity:0.6;" title="Supprimer la série">
+              ${ICONS.close}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="edit-wk-exo-card" style="padding:16px 0; border-bottom:1px solid var(--hairline);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+            <div style="font-weight:900; font-size:0.75rem; color:var(--volt); letter-spacing:0.1em; text-transform:uppercase;">
+              MOUVEMENT 0${exoIdx + 1}
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="glass-tag ${ex.unilateral ? 'uni' : 'bi'} edit-wk-toggle-uni" data-exo-idx="${exoIdx}">
+                ${ex.unilateral ? '🦿 Unilatéral G/D' : '🏋️ Bilatéral'}
+              </button>
+              ${exoIdx > 0 ? `<button type="button" class="circle-icon-btn edit-wk-move-up" style="width:28px; height:28px;" data-exo-idx="${exoIdx}" title="Monter">↑</button>` : ''}
+              ${exoIdx < draft.exercises.length - 1 ? `<button type="button" class="circle-icon-btn edit-wk-move-down" style="width:28px; height:28px;" data-exo-idx="${exoIdx}" title="Descendre">↓</button>` : ''}
+              <button type="button" class="circle-icon-btn edit-wk-remove-exo" style="width:28px; height:28px;" data-exo-idx="${exoIdx}" title="Supprimer l'exercice">${ICONS.close}</button>
+            </div>
+          </div>
+
+          <input
+            type="text"
+            list="history-exos-datalist"
+            class="open-input-line edit-wk-exo-name"
+            data-exo-idx="${exoIdx}"
+            value="${escapeAttr(ex.exoName)}"
+            placeholder="Nom de l'exercice..."
+            style="font-size:1.15rem; font-weight:800; margin-bottom:12px;"
+          />
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            ${setsHtml}
+          </div>
+
+          <button type="button" class="btn btn-ghost btn-sm edit-wk-add-set" data-exo-idx="${exoIdx}" style="margin-top:8px;">
+            + Ajouter une série
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    openModal('Modifier la séance', `
+      <datalist id="history-exos-datalist">${datalistOptions}</datalist>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--hairline);">
+        <div>
+          <label style="font-size:0.72rem; color:var(--text-dim); font-weight:800; text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:4px;">Nom de la séance</label>
+          <input type="text" id="edit-wk-name-input" class="open-input-line" style="font-size:1.35rem; font-weight:900;" value="${escapeAttr(draft.name)}" placeholder="Titre de la séance..." />
+        </div>
+        <div>
+          <label style="font-size:0.72rem; color:var(--text-dim); font-weight:800; text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:4px;">Date et heure</label>
+          <input type="datetime-local" id="edit-wk-date-input" class="open-input-line" style="font-size:1rem; font-weight:700; color:#fff;" value="${toDatetimeLocalValue(draft.date)}" />
+        </div>
+      </div>
+
+      <div id="edit-wk-exos-wrap">${exosHtml}</div>
+
+      <button type="button" class="btn btn-secondary btn-block" id="edit-wk-add-exo-btn" style="margin-top:14px;">
+        + Ajouter un mouvement
+      </button>
+
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:24px;">
+        <button type="button" class="btn btn-primary btn-block" id="edit-wk-save-btn">
+          Enregistrer les modifications
+        </button>
+        <button type="button" class="btn btn-ghost btn-block" id="edit-wk-delete-btn" style="color:#ef4444;">
+          Supprimer définitivement cette séance
+        </button>
+      </div>
+    `);
+
+    // Attach listeners
+    document.getElementById('edit-wk-name-input')?.addEventListener('input', (e) => {
+      draft.name = e.target.value;
+    });
+
+    document.getElementById('edit-wk-date-input')?.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (val) {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) draft.date = d.toISOString();
+      }
+    });
+
+    document.querySelectorAll('.edit-wk-exo-name').forEach((el) => {
+      el.addEventListener('input', (e) => {
+        const exoIdx = parseInt(e.target.dataset.exoIdx);
+        const val = e.target.value;
+        draft.exercises[exoIdx].exoName = val;
+        const match = state.exercises.find((ex) => ex.name.toLowerCase() === val.trim().toLowerCase());
+        if (match) {
+          draft.exercises[exoIdx].unilateral = !!match.unilateral;
+          draft.exercises[exoIdx].exerciseId = match.id;
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-toggle-uni').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        const ex = draft.exercises[exoIdx];
+        ex.unilateral = !ex.unilateral;
+        ex.sets.forEach((s) => {
+          if (ex.unilateral) {
+            if (!s.repsLeft && !s.repsRight && s.reps) {
+              s.repsLeft = s.reps;
+              s.repsRight = s.reps;
+            }
+          } else {
+            if (!s.reps && (s.repsLeft || s.repsRight)) {
+              s.reps = s.repsLeft || s.repsRight;
+            }
+          }
+        });
+        renderEditModal();
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-move-up').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        if (exoIdx > 0) {
+          [draft.exercises[exoIdx - 1], draft.exercises[exoIdx]] = [draft.exercises[exoIdx], draft.exercises[exoIdx - 1]];
+          renderEditModal();
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-move-down').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        if (exoIdx < draft.exercises.length - 1) {
+          [draft.exercises[exoIdx + 1], draft.exercises[exoIdx]] = [draft.exercises[exoIdx], draft.exercises[exoIdx + 1]];
+          renderEditModal();
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-remove-exo').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        draft.exercises.splice(exoIdx, 1);
+        renderEditModal();
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-set-input').forEach((el) => {
+      el.addEventListener('input', (e) => {
+        const exoIdx = parseInt(e.target.dataset.exoIdx);
+        const setIdx = parseInt(e.target.dataset.setIdx);
+        const field = e.target.dataset.field;
+        draft.exercises[exoIdx].sets[setIdx][field] = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-cycle-tag').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        const setIdx = parseInt(e.currentTarget.dataset.setIdx);
+        const s = draft.exercises[exoIdx].sets[setIdx];
+        const order = ['1', 'W', 'D', 'F'];
+        const cur = ['W', 'D', 'F'].includes(s.tag) ? s.tag : '1';
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        s.tag = next === '1' ? String(setIdx + 1) : next;
+        renderEditModal();
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-toggle-done').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        const setIdx = parseInt(e.currentTarget.dataset.setIdx);
+        draft.exercises[exoIdx].sets[setIdx].done = !draft.exercises[exoIdx].sets[setIdx].done;
+        renderEditModal();
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-remove-set').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        const setIdx = parseInt(e.currentTarget.dataset.setIdx);
+        draft.exercises[exoIdx].sets.splice(setIdx, 1);
+        renderEditModal();
+      });
+    });
+
+    document.querySelectorAll('.edit-wk-add-set').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const exoIdx = parseInt(e.currentTarget.dataset.exoIdx);
+        const ex = draft.exercises[exoIdx];
+        const lastSet = ex.sets[ex.sets.length - 1];
+        ex.sets.push({
+          id: uid('set'),
+          tag: String(ex.sets.length + 1),
+          weight: lastSet ? lastSet.weight : '',
+          reps: !ex.unilateral && lastSet ? lastSet.reps : '',
+          repsLeft: ex.unilateral && lastSet ? lastSet.repsLeft : '',
+          repsRight: ex.unilateral && lastSet ? lastSet.repsRight : '',
+          rir: '',
+          done: true,
+          prBadge: null
+        });
+        renderEditModal();
+      });
+    });
+
+    document.getElementById('edit-wk-add-exo-btn')?.addEventListener('click', () => {
+      draft.exercises.push({
+        id: uid('wexo'),
+        exerciseId: '',
+        exoName: '',
+        unilateral: false,
+        targetReps: '8-12',
+        restSeconds: DEFAULT_REST_SEC,
+        bisetWithNext: false,
+        sets: [
+          { id: uid('set'), tag: '1', weight: '', reps: '', repsLeft: '', repsRight: '', rir: '', done: true }
+        ]
+      });
+      renderEditModal();
+    });
+
+    document.getElementById('edit-wk-delete-btn')?.addEventListener('click', () => {
+      if (confirm('Es-tu sûr de vouloir supprimer définitivement cette séance de l’historique ?')) {
+        state.history = state.history.filter((h) => h.id !== wkId);
+        saveState(true);
+        renderAll();
+        closeModal();
+        showToast('Séance supprimée');
+      }
+    });
+
+    document.getElementById('edit-wk-save-btn')?.addEventListener('click', () => {
+      const targetIdx = state.history.findIndex((h) => h.id === wkId);
+      if (targetIdx === -1) return;
+
+      const finalExercises = draft.exercises
+        .filter((ex) => ex.exoName && ex.exoName.trim().length > 0)
+        .map((ex) => {
+          const cleanName = ex.exoName.trim();
+          const createdOrFound = findOrCreateExerciseByName(cleanName, ex.unilateral, ex.restSeconds || DEFAULT_REST_SEC);
+          const exoId = createdOrFound ? createdOrFound.id : (ex.exerciseId || uid('exo'));
+
+          return {
+            id: ex.id || uid('wexo'),
+            exerciseId: exoId,
+            targetReps: ex.targetReps || '8-12',
+            restSeconds: ex.restSeconds || DEFAULT_REST_SEC,
+            unilateral: !!ex.unilateral,
+            bisetWithNext: !!ex.bisetWithNext,
+            sets: ex.sets.map((s, sIdx) => {
+              const hasWeight = parseFloat(s.weight) > 0;
+              const hasReps = ex.unilateral
+                ? (parseInt(s.repsLeft) > 0 || parseInt(s.repsRight) > 0)
+                : (parseInt(s.reps) > 0);
+              const isDone = s.done !== false && (s.done || (hasWeight && hasReps));
+              return {
+                id: s.id || uid('set'),
+                tag: s.tag || String(sIdx + 1),
+                weight: s.weight !== undefined && s.weight !== null ? String(s.weight) : '',
+                reps: !ex.unilateral ? String(s.reps || '') : '',
+                repsLeft: ex.unilateral ? String(s.repsLeft || '') : '',
+                repsRight: ex.unilateral ? String(s.repsRight || '') : '',
+                rir: s.rir || '',
+                done: isDone,
+                prBadge: s.prBadge || null
+              };
+            })
+          };
+        });
+
+      state.history[targetIdx] = {
+        ...state.history[targetIdx],
+        name: draft.name.trim() || 'Séance',
+        date: draft.date,
+        exercises: finalExercises
+      };
+
+      saveState(true);
+      renderAll();
+      closeModal();
+      showToast('Séance modifiée avec succès !', true);
+    });
+  }
+
+  renderEditModal();
+}
+
+function openAllHistoryModal() {
+  const allHistorySorted = [...state.history].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const listHtml = allHistorySorted.length === 0
+    ? `<div style="padding:24px 0; color:var(--text-ghost); text-align:center;">Aucune séance dans l'historique</div>`
+    : allHistorySorted.map((wk) => {
+        const totalSets = (wk.exercises || []).reduce((acc, ex) => acc + (ex.sets || []).filter((s) => s.done).length, 0);
+        return `
+          <div style="padding:14px 0; border-bottom:1px solid var(--hairline); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div style="cursor:pointer; flex:1;" class="all-history-item" data-id="${wk.id}">
+              <div style="font-weight:800; font-size:1rem; letter-spacing:-0.02em;">${escapeHtml(wk.name)}</div>
+              <div style="font-size:0.78rem; color:var(--text-dim); margin-top:2px;">
+                ${formatDateShort(wk.date)} — ${(wk.exercises || []).length} exos • ${totalSets} séries validées
+              </div>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="circle-icon-btn all-history-edit" data-id="${wk.id}" title="Modifier">
+                ${ICONS.edit}
+              </button>
+              <button type="button" class="circle-icon-btn all-history-delete" data-id="${wk.id}" title="Supprimer">
+                ${ICONS.trash}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+  openModal(`Historique complet (${allHistorySorted.length})`, `
+    <div style="max-height:65dvh; overflow-y:auto; padding-right:2px;">
+      ${listHtml}
+    </div>
+  `);
+
+  document.querySelectorAll('.all-history-item').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      openHistoryDetailModal(e.currentTarget.dataset.id);
+    });
+  });
+
+  document.querySelectorAll('.all-history-edit').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      openEditHistoryModal(e.currentTarget.dataset.id);
+    });
+  });
+
+  document.querySelectorAll('.all-history-delete').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.dataset.id;
+      if (confirm('Supprimer cette séance de l’historique ?')) {
+        state.history = state.history.filter((h) => h.id !== id);
+        saveState(true);
+        renderAll();
+        openAllHistoryModal();
+        showToast('Séance supprimée');
+      }
+    });
+  });
 }
 
 function exportDataJson() {
